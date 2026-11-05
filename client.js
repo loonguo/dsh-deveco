@@ -340,14 +340,12 @@ window.__ModuleLoader__.load({
       const running = Boolean(state && state.running);
       const device = state && state.device;
       const project = state && state.project;
-      const ideRunning = Boolean(state && state.ideRunning);
-      const ideText = ideRunning ? translate('ideOpen') : translate('ideClosed');
       const deviceText = device ? `${device.model || device.key}${device.api ? ` · API ${device.api}` : ''}` : translate('noDevice');
       const projectText = project ? project.name : translate('noProject');
       const detail = state && state.message && state.message !== '' ? state.message : translate('ready');
       const tooltip = error
         ? `${translate('failed')}: ${error}`
-        : `${projectText}${project && project.dir ? ` (${project.dir})` : ''} · ${deviceText}\n${ideText}${state && state.port ? ` · port ${state.port}` : ''}\n${detail}\n${translate('moveHint')}`;
+        : `${projectText}${project && project.dir ? ` (${project.dir})` : ''} · ${deviceText}${state && state.port ? ` · port ${state.port}` : ''}\n${detail}\n${translate('moveHint')}`;
       const dotColor = error
         ? 'var(--dsw-alias-state-error-primary)'
         : busy
@@ -435,19 +433,6 @@ window.__ModuleLoader__.load({
             'aria-hidden': true,
           }),
           h('span', { key: 'title', style: { ...labelStyle, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 } }, 'DevEco Studio'),
-          h(
-            'span',
-            {
-              key: 'ide',
-              style: {
-                ...labelStyle,
-                flex: '0 0 auto',
-                fontSize: '10px',
-                color: ideRunning ? 'var(--dsw-alias-state-success-primary)' : 'var(--dsw-alias-label-tertiary)',
-              },
-            },
-            ideText,
-          ),
         ),
         h(
           'div',
