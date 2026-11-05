@@ -16,7 +16,7 @@ import { buildProject, hvigorVersion } from './build.js';
 import { createDebugService } from './debug.js';
 import { createDeviceService } from './device.js';
 import { createEmulatorService } from './emulator.js';
-import { discover, resolveProjectDir } from './paths.js';
+import { discover, findRecentProject, isProjectRoot, resolveProjectDir } from './paths.js';
 import { describeProject, findArtifacts, readBundleName, readModules } from './project.js';
 import { run } from './exec.js';
 import { createIdeService } from './ide.js';
@@ -67,6 +67,7 @@ export function createRuntime(rawConfig, hooks = {}) {
   let busy = null;
   let message = '';
   let lastError = '';
+  let lastProjectDir = '';
   /** @type {Map<string, { at: number, info: any }>} */
   const deviceInfoCache = new Map();
 
@@ -123,12 +124,19 @@ export function createRuntime(rawConfig, hooks = {}) {
    */
   runtime.resolveProject = (explicit, sessionId) => {
     const sessionDir = sessionId === undefined ? undefined : runtime.sessionDirectory(sessionId);
-    const dir = resolveProjectDir(config, explicit, sessionDir ?? workspace);
+    let dir = resolveProjectDir(config, explicit, sessionDir ?? workspace);
+    // A session that does not live inside a HarmonyOS project (this plugin's
+    // own repository, a scratch session) still gets the toolbar: fall back to
+    // the project this runtime used last, then to the most recently touched
+    // project under the usual DevEco project roots.
+    if (dir === null && lastProjectDir !== '' && isProjectRoot(lastProjectDir)) dir = lastProjectDir;
+    if (dir === null) dir = findRecentProject();
     if (dir === null) {
       throw new Error(
         `no HarmonyOS project was found${explicit ? ` at "${explicit}"` : ''}. Pass project, set projectRoot in the dsh-deveco config, or run from a project directory (AppScope/app.json5).`,
       );
     }
+    lastProjectDir = dir;
     const modules = readModules(dir);
     const entry = modules.find((module) => module.type === 'entry') ?? modules[0] ?? null;
     return {
@@ -156,9 +164,9 @@ export function createRuntime(rawConfig, hooks = {}) {
 
   /** Build the project and remember the outcome for the toolbar. */
   runtime.build = async (options = {}) => {
-    const started = Date.now();
+    const project = options.project ?? runtime.resolveProject(options.projectDir, options.sessionId);
     const result = await buildProject(runtime, {
-      projectDir: options.projectDir,
+      projectDir: project.dir,
       task: options.task ?? 'assembleHap',
       module: options.module,
       product: options.product ?? 'default',

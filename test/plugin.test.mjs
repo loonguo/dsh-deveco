@@ -40,8 +40,6 @@ assert.equal(tools.size, 0, 'disposing the plugin unregisters every tool');
 
 const runtime = createRuntime({ devecoPath: 'D:\\Software\\DevEco Studio' });
 const definitions = createToolDefinitions({ runtime, ctx });
-const build = definitions.find((tool) => tool.name === 'deveco_build');
-await assert.rejects(() => build.execute({}, {}), /no HarmonyOS project was found/);
 const ui = definitions.find((tool) => tool.name === 'deveco_ui');
 await assert.rejects(() => ui.execute({ action: 'nope' }, {}), /must be one of/);
 await assert.rejects(() => ui.execute({ action: 'tap' }, {}), /requires x and y/);

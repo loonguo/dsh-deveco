@@ -267,7 +267,9 @@ window.__ModuleLoader__.load({
       const deviceText = device ? `${device.model || device.key}${device.api ? ` · API ${device.api}` : ''}` : translate('noDevice');
       const projectText = project ? project.name : translate('noProject');
       const detail = state && state.message && state.message !== '' ? state.message : translate('ready');
-      const tooltip = error ? `${translate('failed')}: ${error}` : `${projectText} · ${deviceText}\n${detail}\n${translate('moveHint')}`;
+      const tooltip = error
+        ? `${translate('failed')}: ${error}`
+        : `${projectText}${project && project.dir ? ` (${project.dir})` : ''} · ${deviceText}\n${detail}\n${translate('moveHint')}`;
       const dotColor = error
         ? 'var(--dsw-alias-state-error-primary)'
         : busy

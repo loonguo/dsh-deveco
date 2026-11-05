@@ -106,7 +106,11 @@ function defineTool({ name, description, parameters, schema, render, execute, ti
     output: { schema, render: (args, value) => render(args, value) },
     timeoutMs,
     async execute(rawArgs, exec) {
-      return execute(validateArguments(name, compiled, rawArgs), exec);
+      const value = await execute(validateArguments(name, compiled, rawArgs), exec);
+      // The Host requires a lossless JSON value; tool results are built from
+      // process output and optional fields, so normalise once here.
+      if (value === null || value === undefined) return value;
+      return typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value;
     },
   };
 }
@@ -188,7 +192,9 @@ export function createToolDefinitions({ runtime, ctx }) {
         } catch {
           emulators = [];
         }
-        return { ...snapshot, versions, emulators, deviceError: undefined, projectError: undefined, error: undefined };
+        // Tool values must survive a JSON round-trip unchanged: the harness
+        // rejects undefined/NaN, and snapshot fields are conditionally present.
+        return JSON.parse(JSON.stringify({ ...snapshot, versions, emulators }));
       },
       render: (args, value) => {
         const lines = ['DevEco Studio toolchain'];

@@ -148,6 +148,8 @@ HarmonyOS 的**应用内断点、单步、变量查看**由 DevEco Studio 自带
 
 面板每 3 秒轮询 `GET /dsh-deveco/state`，按钮通过 `POST /dsh-deveco/control` 触发与 Agent 工具相同的 runtime 方法；位置保存在 `localStorage`，双击复位。样式只使用 `--dsw-alias-*` 主题变量，中英文文案走 Client locale 服务。
 
+**面板作用于哪个工程**：按顺序解析 — 本次调用的 `project` → 会话工作目录（或其最近的工程祖先）→ 配置里的 `projectRoot` → 本进程上一次成功使用的工程 → DevEco 常用工程目录下最近修改的工程（`%USERPROFILE%\DevEcoStudioProjects`、`D:\DeepSeekHarness\projects`、`D:\Project`、`D:\Projects`）。因此当前会话不在鸿蒙工程目录里时，面板仍会落到最近工程并显示其名称，而不是把按钮全部禁用；工程路径在按钮提示（tooltip）里。运行/停止/构建/打开 IDE 四个按钮都走同一套解析逻辑。
+
 ---
 
 ## 代码结构
@@ -168,7 +170,7 @@ src/ide.js          DevEco Studio 进程启动与文件定位
 src/tools.js        10 个模型工具的 schema、参数校验、文本/图片渲染
 src/control.js      面板 HTTP 路由（同源校验、JSON 边界）
 templates/app/      API 26 Stage 模型 ArkTS 工程模板（含占位符）
-test/               smoke / plugin / e2e 三层测试
+test/               smoke / plugin / toolbar / e2e 四层测试
 ```
 
 设计约束：Host 侧零依赖、不 import harness 包；所有子进程登记在 `src/exec.js`，插件卸载（HMR / profile reload）时统一 `taskkill /T` 清理，避免遗留 hvigor 守护进程或 hilog 流。
@@ -190,12 +192,16 @@ test/               smoke / plugin / e2e 三层测试
 | 布局/点击 | 解析到 33 个节点，定位 `Tap me` 按钮并点击，计数器从 `Tapped 0 times` 变为 `Tapped 1 times` |
 | 调试 | `debug start` 成功（PID、`inDebugTransport: true`），`cancel` 成功停止 |
 | 崩溃日志 | 模拟器 faultlogger 不可读时返回明确说明而不是报错 |
+| 悬浮面板链路 | `test/toolbar.test.mjs`：非工程会话下 state 正确回落到 `HelloWorld`，按钮触发的 build（成功）与 run（PID 返回）均通过 HTTP 路由完成 |
 | 单元测试 | `node test/smoke.mjs`、`node test/plugin.test.mjs` 通过 |
 
-复跑端到端测试（需要设备/模拟器 + 可创建软链接的权限）：
+复跑测试：
 
 ```powershell
-node test/e2e.mjs
+node test/smoke.mjs
+node test/plugin.test.mjs
+node test/toolbar.test.mjs   # 需要设备/模拟器 + 可创建软链接的权限，会构建并启动 HelloWorld
+node test/e2e.mjs            # 从零脚手架到调试生命周期的完整回归
 ```
 
 ---
@@ -211,6 +217,8 @@ node test/e2e.mjs
 | 安装报签名错误 | 在 DevEco Studio 里启用自动签名后重新构建（见“签名说明”） |
 | `debug start` 后界面停在启动页 | 这是等待调试器的预期状态；用 `cancel` 退出，或在 IDE 中附加调试器 |
 | 面板不出现 | 确认已重启 DSH；客户端模块只在页面加载时注册一次 |
+| 面板按钮灰掉、或点了报 `The "path" argument must be of type string` | 旧版 Host 在会话不属于任何鸿蒙工程时解析不到工程；1.0.1 起会回落到最近工程。升级后需重启 DSH 让 Host 重新加载 |
+| 面板提示 “restart DSH to activate it” | Host 侧代码尚未随本次启动装载，重启 DSH 即可 |
 
 ---
 

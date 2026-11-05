@@ -287,3 +287,46 @@ export function resolveProjectDir(config, explicit, startDir) {
   }
   return null;
 }
+
+/**
+ * Find the most recently touched HarmonyOS project under the usual DevEco
+ * project roots. Used only as the last fallback, so a session that is not
+ * itself inside a project still gets a usable toolbar.
+ */
+export function findRecentProject() {
+  const roots = [
+    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'DevEcoStudioProjects') : null,
+    'D:\\DeepSeekHarness\\projects',
+    'D:\\Project',
+    'D:\\Projects',
+  ].filter((root) => typeof root === 'string' && root.length > 0);
+  let best = null;
+  for (const root of roots) {
+    if (!existsSync(root)) continue;
+    const visit = (directory, depth) => {
+      if (depth > 2) return;
+      if (existsSync(path.join(directory, 'AppScope', 'app.json5'))) {
+        try {
+          const mtime = statSync(path.join(directory, 'AppScope', 'app.json5')).mtimeMs;
+          if (best === null || mtime > best.mtime) best = { dir: directory, mtime };
+        } catch {
+          /* vanished between exists and stat */
+        }
+        return;
+      }
+      let entries;
+      try {
+        entries = readdirSync(directory, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (/^(node_modules|oh_modules|build|\.git|\.idea|\.hvigor|\.preview)$/i.test(entry.name)) continue;
+        visit(path.join(directory, entry.name), depth + 1);
+      }
+    };
+    visit(root, 0);
+  }
+  return best === null ? null : best.dir;
+}
