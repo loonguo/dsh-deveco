@@ -262,12 +262,17 @@ export function isProjectRoot(directory) {
 }
 
 /**
- * Resolve a project directory: explicit argument, configured default, the
- * session working directory, or the nearest ancestor of `startDir`.
+ * Resolve the HarmonyOS project for one workspace.
+ *
+ * Order: the explicit argument; then the workspace directory itself or its
+ * nearest project ancestor. A workspace that is not inside a project yields
+ * null — `projectRoot` is only consulted when no workspace directory is known
+ * at all (a tool call outside a session), because a configured default must
+ * never make an unrelated workspace look like a project.
  *
  * @param {{ projectRoot?: string }} config
  * @param {string|undefined} explicit
- * @param {string|undefined} startDir
+ * @param {string|undefined} startDir workspace or session working directory
  */
 export function resolveProjectDir(config, explicit, startDir) {
   const tryDir = (candidate) => {
@@ -276,57 +281,17 @@ export function resolveProjectDir(config, explicit, startDir) {
     if (isProjectRoot(resolved)) return resolved;
     return null;
   };
-  const direct = tryDir(explicit) ?? tryDir(config.projectRoot ?? '');
+  const direct = tryDir(explicit);
   if (direct) return direct;
-  let current = path.resolve(startDir ?? config.projectRoot ?? process.cwd());
-  for (let depth = 0; depth < 8; depth += 1) {
-    if (isProjectRoot(current)) return current;
-    const parent = path.dirname(current);
-    if (parent === current) break;
-    current = parent;
+  if (typeof startDir === 'string' && startDir.length > 0) {
+    let current = path.resolve(startDir);
+    for (let depth = 0; depth < 8; depth += 1) {
+      if (isProjectRoot(current)) return current;
+      const parent = path.dirname(current);
+      if (parent === current) break;
+      current = parent;
+    }
+    return null;
   }
-  return null;
-}
-
-/**
- * Find the most recently touched HarmonyOS project under the usual DevEco
- * project roots. Used only as the last fallback, so a session that is not
- * itself inside a project still gets a usable toolbar.
- */
-export function findRecentProject() {
-  const roots = [
-    process.env.USERPROFILE ? path.join(process.env.USERPROFILE, 'DevEcoStudioProjects') : null,
-    'D:\\DeepSeekHarness\\projects',
-    'D:\\Project',
-    'D:\\Projects',
-  ].filter((root) => typeof root === 'string' && root.length > 0);
-  let best = null;
-  for (const root of roots) {
-    if (!existsSync(root)) continue;
-    const visit = (directory, depth) => {
-      if (depth > 2) return;
-      if (existsSync(path.join(directory, 'AppScope', 'app.json5'))) {
-        try {
-          const mtime = statSync(path.join(directory, 'AppScope', 'app.json5')).mtimeMs;
-          if (best === null || mtime > best.mtime) best = { dir: directory, mtime };
-        } catch {
-          /* vanished between exists and stat */
-        }
-        return;
-      }
-      let entries;
-      try {
-        entries = readdirSync(directory, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        if (/^(node_modules|oh_modules|build|\.git|\.idea|\.hvigor|\.preview)$/i.test(entry.name)) continue;
-        visit(path.join(directory, entry.name), depth + 1);
-      }
-    };
-    visit(root, 0);
-  }
-  return best === null ? null : best.dir;
+  return tryDir(config.projectRoot ?? '');
 }

@@ -22,9 +22,12 @@
 #       hvigorw wrapper under tools/hvigor).
 #
 #   projectRoot       (string, default '')
-#       Default project directory. Every tool that takes `project` still
-#       accepts an explicit override; empty means "use the session working
-#       directory when it holds AppScope/app.json5".
+#       Default project directory used only when no workspace directory is
+#       known at all (a tool call without a session). Sessions always resolve
+#       their own workspace: the session directory or its nearest ancestor
+#       holding AppScope/app.json5. A workspace without a project yields "no
+#       project" — the floating panel stays hidden. Every tool that takes
+#       `project` still accepts an explicit override.
 #
 #   device            (string, default '')
 #       Default hdc connect key (for example 127.0.0.1:5555). Empty selects

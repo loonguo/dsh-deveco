@@ -16,7 +16,7 @@ import { buildProject, hvigorVersion } from './build.js';
 import { createDebugService } from './debug.js';
 import { createDeviceService } from './device.js';
 import { createEmulatorService } from './emulator.js';
-import { discover, findRecentProject, isProjectRoot, resolveProjectDir } from './paths.js';
+import { discover, resolveProjectDir } from './paths.js';
 import { describeProject, findArtifacts, readBundleName, readModules } from './project.js';
 import { run } from './exec.js';
 import { createIdeService } from './ide.js';
@@ -70,7 +70,6 @@ export function createRuntime(rawConfig, hooks = {}) {
   let busy = null;
   let message = '';
   let lastError = '';
-  let lastProjectDir = '';
   /** @type {Map<string, { at: number, info: any }>} */
   const deviceInfoCache = new Map();
 
@@ -121,25 +120,41 @@ export function createRuntime(rawConfig, hooks = {}) {
   runtime.ide = createIdeService(runtime);
 
   /**
+   * The working directory of the session a tool call belongs to, when the host
+   * exposes it. Lets tools resolve the project of *their* workspace instead of
+   * the process directory.
+   */
+  runtime.execDirectory = (exec) => {
+    try {
+      return hooks.resolveAgentDirectory?.(exec?.agent);
+    } catch {
+      return undefined;
+    }
+  };
+
+  /**
    * Resolve a project plus the module and ability a launch should use.
+   *
+   * The workspace decides: the explicit argument, else the session directory
+   * (or its nearest project ancestor), else — only when no workspace is known —
+   * the configured `projectRoot`. A workspace without a project yields an
+   * error, never a project borrowed from somewhere else.
+   *
    * @param {string|undefined} explicit
    * @param {string|undefined} sessionId
+   * @param {string|undefined} startDir workspace directory when no session id is known
    */
-  runtime.resolveProject = (explicit, sessionId) => {
+  runtime.resolveProject = (explicit, sessionId, startDir) => {
     const sessionDir = sessionId === undefined ? undefined : runtime.sessionDirectory(sessionId);
-    let dir = resolveProjectDir(config, explicit, sessionDir ?? workspace);
-    // A session that does not live inside a HarmonyOS project (this plugin's
-    // own repository, a scratch session) still gets the toolbar: fall back to
-    // the project this runtime used last, then to the most recently touched
-    // project under the usual DevEco project roots.
-    if (dir === null && lastProjectDir !== '' && isProjectRoot(lastProjectDir)) dir = lastProjectDir;
-    if (dir === null) dir = findRecentProject();
+    const base = sessionDir ?? startDir;
+    const dir = resolveProjectDir(config, explicit, base);
     if (dir === null) {
       throw new Error(
-        `no HarmonyOS project was found${explicit ? ` at "${explicit}"` : ''}. Pass project, set projectRoot in the dsh-deveco config, or run from a project directory (AppScope/app.json5).`,
+        base
+          ? `no HarmonyOS project in this workspace (${base}). Open a folder that contains AppScope/app.json5, or pass project explicitly.`
+          : `no HarmonyOS project was found${explicit ? ` at "${explicit}"` : ''}. Open a HarmonyOS project workspace, or pass project.`,
       );
     }
-    lastProjectDir = dir;
     const modules = readModules(dir);
     const entry = modules.find((module) => module.type === 'entry') ?? modules[0] ?? null;
     return {
@@ -167,7 +182,7 @@ export function createRuntime(rawConfig, hooks = {}) {
 
   /** Build the project and remember the outcome for the toolbar. */
   runtime.build = async (options = {}) => {
-    const project = options.project ?? runtime.resolveProject(options.projectDir, options.sessionId);
+    const project = options.project ?? runtime.resolveProject(options.projectDir, options.sessionId, options.startDir);
     const result = await buildProject(runtime, {
       projectDir: project.dir,
       task: options.task ?? 'assembleHap',
@@ -195,7 +210,7 @@ export function createRuntime(rawConfig, hooks = {}) {
 
   /** Install one HAP on a device. */
   runtime.install = async (options = {}) => {
-    const project = options.project ?? runtime.resolveProject(options.projectDir, options.sessionId);
+    const project = options.project ?? runtime.resolveProject(options.projectDir, options.sessionId, options.startDir);
     const device = options.device ?? (await runtime.device.select(options.deviceKey));
     const artifact = runtime.pickArtifact(project.dir, options.hap);
     const result = await runtime.device.install(artifact.path, device, { timeoutMs: options.timeoutMs ?? 180000 });
@@ -273,7 +288,7 @@ export function createRuntime(rawConfig, hooks = {}) {
 
   /** Launch the app (optionally building/installing first). */
   runtime.run = async (options = {}) => {
-    const project = options.project ?? runtime.resolveProject(options.projectDir, options.sessionId);
+    const project = options.project ?? runtime.resolveProject(options.projectDir, options.sessionId, options.startDir);
     const steps = [];
     let buildResult = null;
     let device;
@@ -352,7 +367,7 @@ export function createRuntime(rawConfig, hooks = {}) {
 
   /** Force-stop the app of the current/last project. */
   runtime.stop = async (options = {}) => {
-    const project = options.project ?? lastRun?.project ?? runtime.resolveProject(options.projectDir, options.sessionId);
+    const project = options.project ?? lastRun?.project ?? runtime.resolveProject(options.projectDir, options.sessionId, options.startDir);
     const device = options.device ?? lastRun?.device ?? (await runtime.device.select(options.deviceKey));
     const result = await runtime.device.forceStop(device, project.bundleName);
     lastRun = { ...(lastRun ?? {}), pid: null, project, device, at: new Date().toISOString() };
@@ -394,7 +409,7 @@ export function createRuntime(rawConfig, hooks = {}) {
     let project = null;
     let projectError = '';
     try {
-      project = runtime.resolveProject(options.projectDir, options.sessionId);
+      project = runtime.resolveProject(options.projectDir, options.sessionId, options.startDir);
     } catch (error) {
       projectError = String(error?.message ?? error);
     }
@@ -443,7 +458,7 @@ export function createRuntime(rawConfig, hooks = {}) {
         case 'stop':
           return await runtime.stop(options);
         case 'open':
-          return await runtime.ide.open({ projectDir: runtime.resolveProject(options.projectDir, options.sessionId).dir });
+          return await runtime.ide.open({ projectDir: runtime.resolveProject(options.projectDir, options.sessionId, options.startDir).dir });
         default:
           throw new Error(`unknown action "${action}"`);
       }

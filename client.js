@@ -332,6 +332,10 @@ window.__ModuleLoader__.load({
         }
       };
 
+      // The panel belongs to a HarmonyOS workspace: without a project there is
+      // nothing to build or run, so it renders nothing at all.
+      if (state === null || state === undefined || !state.project) return null;
+
       const busy = Boolean(state && state.busy) || pending !== '';
       const running = Boolean(state && state.running);
       const device = state && state.device;

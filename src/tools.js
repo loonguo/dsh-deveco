@@ -157,7 +157,7 @@ function formatDiagnostic(entry) {
  * @param {{ runtime: any, ctx: any }} input
  */
 export function createToolDefinitions({ runtime, ctx }) {
-  const requireProject = (args) => runtime.resolveProject(args.project, args.sessionId);
+  const requireProject = (args, exec) => runtime.resolveProject(args.project, args.sessionId, runtime.execDirectory(exec));
 
   return [
     defineTool({
@@ -183,9 +183,10 @@ export function createToolDefinitions({ runtime, ctx }) {
           toolbar: { oneOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
         },
       },
-      async execute(args) {
-        runtime.attachWorkspace(runtime.sessionDirectory(args.sessionId) ?? runtime.workspace);
-        const snapshot = await runtime.snapshot({ projectDir: args.project, sessionId: args.sessionId });
+      async execute(args, exec) {
+        const startDir = runtime.execDirectory(exec);
+        runtime.attachWorkspace(startDir ?? runtime.sessionDirectory(args.sessionId) ?? runtime.workspace);
+        const snapshot = await runtime.snapshot({ projectDir: args.project, sessionId: args.sessionId, startDir });
         const versions = await runtime.versions().catch(() => ({ hdc: '', hvigor: '' }));
         let emulators = [];
         try {
@@ -345,7 +346,7 @@ export function createToolDefinitions({ runtime, ctx }) {
       },
       timeoutMs: 900000,
       async execute(args, exec) {
-        const project = requireProject(args);
+        const project = requireProject(args, exec);
         runtime.attachWorkspace(project.dir);
         const result = await runtime.build({
           projectDir: project.dir,
@@ -500,8 +501,8 @@ export function createToolDefinitions({ runtime, ctx }) {
         required: ['ok'],
       },
       timeoutMs: 300000,
-      async execute(args) {
-        const project = requireProject(args);
+      async execute(args, exec) {
+        const project = requireProject(args, exec);
         runtime.attachWorkspace(project.dir);
         const device = await runtime.device.select(args.device);
         if (args.uninstall === true) {
@@ -570,7 +571,7 @@ export function createToolDefinitions({ runtime, ctx }) {
       },
       timeoutMs: 900000,
       async execute(args, exec) {
-        const project = requireProject(args);
+        const project = requireProject(args, exec);
         runtime.attachWorkspace(project.dir);
         const device = await runtime.device.select(args.device);
         const result = await runtime.run({
@@ -805,8 +806,8 @@ export function createToolDefinitions({ runtime, ctx }) {
         required: ['action'],
       },
       timeoutMs: 300000,
-      async execute(args) {
-        const project = requireProject(args);
+      async execute(args, exec) {
+        const project = requireProject(args, exec);
         runtime.attachWorkspace(project.dir);
         const device = await runtime.device.select(args.device);
         if (args.action === 'start') {
@@ -867,8 +868,8 @@ export function createToolDefinitions({ runtime, ctx }) {
         required: ['launched'],
       },
       timeoutMs: 60000,
-      async execute(args) {
-        const project = requireProject(args);
+      async execute(args, exec) {
+        const project = requireProject(args, exec);
         runtime.attachWorkspace(project.dir);
         return runtime.ide.open({ projectDir: project.dir, file: args.file, line: args.line });
       },

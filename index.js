@@ -44,7 +44,20 @@ export function apply(ctx, config) {
     return undefined;
   };
 
-  const runtime = createRuntime(config ?? {}, { resolveSessionDirectory });
+  /** Map a tool call's agent to the directory its session works in. */
+  const resolveAgentDirectory = (agent) => {
+    try {
+      const session = agent?.session;
+      if (session !== undefined && session !== null && typeof workingDirectory?.get === 'function') {
+        return workingDirectory.get(session);
+      }
+    } catch {
+      /* a service shape change must not break tool resolution */
+    }
+    return undefined;
+  };
+
+  const runtime = createRuntime(config ?? {}, { resolveSessionDirectory, resolveAgentDirectory });
 
   // The panel runs in the desktop page (file://), where a relative fetch never
   // reaches a DSH plugin route. A dedicated loopback listener makes the toolbar
