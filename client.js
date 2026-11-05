@@ -32,7 +32,12 @@ window.__ModuleLoader__.load({
         run: 'Run app',
         stop: 'Stop app',
         ide: 'Open in DevEco Studio',
-        idle: 'Not running',
+        idle: 'App not running',
+        appIdle: 'App not running',
+        appRunning: 'App running',
+        ideOpen: 'IDE open',
+        ideClosed: 'IDE closed',
+        connecting: 'Connecting…',
         running: 'Running',
         building: 'Building…',
         installing: 'Installing…',
@@ -49,7 +54,12 @@ window.__ModuleLoader__.load({
         run: '运行应用',
         stop: '停止应用',
         ide: '在 DevEco Studio 中打开',
-        idle: '未运行',
+        idle: '应用未运行',
+        appIdle: '应用未运行',
+        appRunning: '应用运行中',
+        ideOpen: 'IDE 已打开',
+        ideClosed: 'IDE 未打开',
+        connecting: '连接中…',
         running: '运行中',
         building: '构建中…',
         installing: '安装中…',
@@ -116,9 +126,60 @@ window.__ModuleLoader__.load({
       return (key) => FALLBACK[key] ?? key;
     }
 
+    /**
+     * The desktop page is `file://`; DSH plugin routes live on the Host process,
+     * not in the Electron IPC bridge the page's relative fetches reach. The Host
+     * therefore starts its own loopback carrier and the panel probes its ports.
+     * A browser deployment (page served over HTTP) still answers the original
+     * relative paths, kept as the last fallback.
+     */
+    const TOOLBAR_PORTS = [5731, 5732, 5733, 5734, 5735, 5736, 5737, 5738, 5739, 5740];
+    let toolbarOrigin = null;
+
+    async function discoverToolbar() {
+      if (toolbarOrigin !== null) return toolbarOrigin;
+      for (const port of TOOLBAR_PORTS) {
+        const origin = `http://127.0.0.1:${port}`;
+        try {
+          const response = await fetch(`${origin}/ping`, {
+            cache: 'no-store',
+            signal: typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(700) : undefined,
+          });
+          if (response.ok) {
+            const body = await response.json().catch(() => ({}));
+            if (body && body.app === 'dsh-deveco') {
+              toolbarOrigin = origin;
+              return origin;
+            }
+          }
+        } catch {
+          /* port not hosting the toolbar; try the next one */
+        }
+      }
+      return null;
+    }
+
+    async function requestToolbar(pathname, init) {
+      const origin = await discoverToolbar();
+      if (origin !== null) {
+        try {
+          return await fetch(`${origin}${pathname}`, init);
+        } catch (error) {
+          toolbarOrigin = null;
+          throw new Error(`DevEco Host unreachable on ${origin}: ${(error && error.message) || error}`);
+        }
+      }
+      // Browser deployment: the DSH web server serves the same paths.
+      try {
+        return await fetch(`/dsh-deveco${pathname}`, init);
+      } catch (error) {
+        throw new Error(`DevEco Host is not reachable (no toolbar listener on ports ${TOOLBAR_PORTS[0]}-${TOOLBAR_PORTS.at(-1)}): restart DSH to activate the plugin`);
+      }
+    }
+
     async function readState(sessionId) {
       const query = typeof sessionId === 'string' && sessionId.length > 0 ? `?sessionId=${encodeURIComponent(sessionId)}` : '';
-      const response = await fetch(`/dsh-deveco/state${query}`, { headers: { accept: 'application/json' } });
+      const response = await requestToolbar(`/state${query}`, { headers: { accept: 'application/json' }, cache: 'no-store' });
       const body = await response.json().catch(() => ({}));
       if (response.status === 404) throw new Error('DevEco Host plugin is not loaded yet — restart DSH to activate it');
       if (!response.ok || body.ok !== true) throw new Error(body.error || `state request failed (HTTP ${response.status})`);
@@ -126,7 +187,7 @@ window.__ModuleLoader__.load({
     }
 
     async function sendControl(request) {
-      const response = await fetch('/dsh-deveco/control', {
+      const response = await requestToolbar('/control', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(request),
@@ -263,13 +324,15 @@ window.__ModuleLoader__.load({
       const running = Boolean(state && state.running);
       const device = state && state.device;
       const project = state && state.project;
-      const statusText = pending === 'build' ? translate('building') : pending === 'run' ? translate('launching') : running ? translate('running') : translate('idle');
+      const statusText = pending === 'build' ? translate('building') : pending === 'run' ? translate('launching') : running ? translate('appRunning') : translate('appIdle');
+      const ideRunning = Boolean(state && state.ideRunning);
+      const ideText = ideRunning ? translate('ideOpen') : translate('ideClosed');
       const deviceText = device ? `${device.model || device.key}${device.api ? ` · API ${device.api}` : ''}` : translate('noDevice');
       const projectText = project ? project.name : translate('noProject');
       const detail = state && state.message && state.message !== '' ? state.message : translate('ready');
       const tooltip = error
         ? `${translate('failed')}: ${error}`
-        : `${projectText}${project && project.dir ? ` (${project.dir})` : ''} · ${deviceText}\n${detail}\n${translate('moveHint')}`;
+        : `${projectText}${project && project.dir ? ` (${project.dir})` : ''} · ${deviceText}\n${ideText}${state && state.port ? ` · port ${state.port}` : ''}\n${detail}\n${translate('moveHint')}`;
       const dotColor = error
         ? 'var(--dsw-alias-state-error-primary)'
         : busy
@@ -358,6 +421,19 @@ window.__ModuleLoader__.load({
           }),
           h('span', { key: 'title', style: { ...labelStyle, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 } }, 'DevEco Studio'),
           h('span', { key: 'status', style: labelStyle }, statusText),
+          h(
+            'span',
+            {
+              key: 'ide',
+              style: {
+                ...labelStyle,
+                flex: '0 0 auto',
+                fontSize: '10px',
+                color: ideRunning ? 'var(--dsw-alias-state-success-primary)' : 'var(--dsw-alias-label-tertiary)',
+              },
+            },
+            ideText,
+          ),
         ),
         h(
           'div',
@@ -389,7 +465,7 @@ window.__ModuleLoader__.load({
               type: 'button',
               title: translate('run'),
               'aria-label': translate('run'),
-              disabled: busy || project === null || device === null,
+              disabled: busy || project === null,
               onClick: () => act('run'),
               style: buttonStyle('var(--dsw-alias-state-success-primary)', busy || project === null || device === null),
             },

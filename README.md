@@ -146,7 +146,9 @@ HarmonyOS 的**应用内断点、单步、变量查看**由 DevEco Studio 自带
 - `conversation.session.header.utilities`：记录当前会话 id（隐藏）
 - `shell.overlay`：右下角可拖动卡片，显示设备/工程/运行状态，提供构建、运行、停止、打开 IDE 四个按钮
 
-面板每 3 秒轮询 `GET /dsh-deveco/state`，按钮通过 `POST /dsh-deveco/control` 触发与 Agent 工具相同的 runtime 方法；位置保存在 `localStorage`，双击复位。样式只使用 `--dsw-alias-*` 主题变量，中英文文案走 Client locale 服务。
+面板每 3 秒轮询状态，按钮通过 `POST /control` 触发与 Agent 工具相同的 runtime 方法；位置保存在 `localStorage`，双击复位。样式只使用 `--dsw-alias-*` 主题变量，中英文文案走 Client locale 服务。
+
+**面板的传输方式**：桌面版 DSH 的页面以 `file://` 加载，页面里的相对 `fetch('/dsh-deveco/state')` 走 Electron IPC 桥，到达不了插件的 Host 路由（只会得到 404）。因此插件在 Host 内自己起了一个只监听 `127.0.0.1` 的小 HTTP 服务（默认端口 5731，被占用时顺延到 5740），面板先探测 `/ping` 再调用 `/state` 与 `/control`；浏览器部署下仍保留 DSH Web 服务器上的 `/dsh-deveco/*` 路由作为回退。
 
 **面板作用于哪个工程**：按顺序解析 — 本次调用的 `project` → 会话工作目录（或其最近的工程祖先）→ 配置里的 `projectRoot` → 本进程上一次成功使用的工程 → DevEco 常用工程目录下最近修改的工程（`%USERPROFILE%\DevEcoStudioProjects`、`D:\DeepSeekHarness\projects`、`D:\Project`、`D:\Projects`）。因此当前会话不在鸿蒙工程目录里时，面板仍会落到最近工程并显示其名称，而不是把按钮全部禁用；工程路径在按钮提示（tooltip）里。运行/停止/构建/打开 IDE 四个按钮都走同一套解析逻辑。
 
@@ -219,6 +221,8 @@ node test/e2e.mjs            # 从零脚手架到调试生命周期的完整回�
 | 面板不出现 | 确认已重启 DSH；客户端模块只在页面加载时注册一次 |
 | 面板按钮灰掉、或点了报 `The "path" argument must be of type string` | 旧版 Host 在会话不属于任何鸿蒙工程时解析不到工程；1.0.1 起会回落到最近工程。升级后需重启 DSH 让 Host 重新加载 |
 | 面板提示 “restart DSH to activate it” | Host 侧代码尚未随本次启动装载，重启 DSH 即可 |
+| 面板显示「应用未运行」但你已打开 DevEco Studio | 面板状态指的是**被调试的鸿蒙应用进程**，不是 IDE；同一行右侧的「IDE 已打开/未打开」才是 DevEco Studio。应用要 `deveco_run` 启动后才会显示运行中 |
+| 面板显示连接不上 5731-5740 | 确认插件 Host 已随本次启动装载（`deveco_status` 的 toolbar 行会给出实际端口）；端口被其他程序占用时会自动顺延，被全部占用时会报告在 toolbar 行 |
 | 插件行显示「异常 / 包不可用」 | DSH 用严格 JSON 读取插件 `package.json`：文件不能带 UTF-8 BOM，`exports` 的 `./client`、`./icon`、`./locale/*.json`、`./package.json` 必须能解析。`test/smoke.mjs` 会检查 BOM 与这些导出 |
 
 ---

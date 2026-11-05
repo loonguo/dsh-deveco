@@ -373,6 +373,15 @@ export function createRuntime(rawConfig, hooks = {}) {
     }
   };
 
+  /** Whether DevEco Studio itself is running (cached: tasklist is a process launch). */
+  let ideCache = { at: 0, value: false };
+  runtime.ideRunning = async () => {
+    if (Date.now() - ideCache.at < 15000) return ideCache.value;
+    const value = await runtime.ide.running().catch(() => false);
+    ideCache = { at: Date.now(), value };
+    return value;
+  };
+
   /** Toolbar state, derived from one snapshot (never throws). */
   runtime.toolbarState = async (sessionId) => {
     let snapshot = null;
@@ -381,6 +390,7 @@ export function createRuntime(rawConfig, hooks = {}) {
     } catch {
       snapshot = null;
     }
+    const ideRunning = await runtime.ideRunning();
     return {
       ok: true,
       state: {
@@ -389,6 +399,8 @@ export function createRuntime(rawConfig, hooks = {}) {
         error: lastError,
         running: snapshot?.running !== null && snapshot?.running !== undefined,
         pid: snapshot?.running ?? null,
+        ideRunning,
+        port: runtime.toolbarPort ?? 0,
         device: snapshot?.device ? { key: snapshot.device.key, model: snapshot.device.model, api: snapshot.device.api, emulator: snapshot.device.emulator } : null,
         project: snapshot?.project ? { name: snapshot.project.name, dir: snapshot.project.dir, bundleName: snapshot.project.bundleName } : null,
         lastBuild: lastBuild === null ? null : { ok: lastBuild.ok, errors: lastBuild.errors, warnings: lastBuild.warnings, at: lastBuild.at },

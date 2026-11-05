@@ -46,6 +46,12 @@
 #   logBufferLines    (number, default 5000)
 #       Lines kept per live hilog capture session.
 #
+#   toolbarPort       (number, default 5731)
+#       First loopback port for the floating panel's own HTTP carrier. The
+#       plugin walks up to ten ports (5731-5740) when one is busy; the panel
+#       probes that same range, so leave the default unless you also rebuild
+#       client.js.
+#
 # Example:
 #
 #   - id: dsh-deveco

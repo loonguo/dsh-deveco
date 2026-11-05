@@ -180,6 +180,7 @@ export function createToolDefinitions({ runtime, ctx }) {
           message: { type: 'string' },
           versions: { type: 'object', additionalProperties: true },
           emulators: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          toolbar: { oneOf: [{ type: 'object', additionalProperties: true }, { type: 'null' }] },
         },
       },
       async execute(args) {
@@ -194,7 +195,8 @@ export function createToolDefinitions({ runtime, ctx }) {
         }
         // Tool values must survive a JSON round-trip unchanged: the harness
         // rejects undefined/NaN, and snapshot fields are conditionally present.
-        return JSON.parse(JSON.stringify({ ...snapshot, versions, emulators }));
+        const toolbar = typeof runtime.toolbarStatus === 'function' ? await runtime.toolbarStatus() : null;
+        return JSON.parse(JSON.stringify({ ...snapshot, versions, emulators, toolbar }));
       },
       render: (args, value) => {
         const lines = ['DevEco Studio toolchain'];
@@ -204,6 +206,7 @@ export function createToolDefinitions({ runtime, ctx }) {
         lines.push(`  hvigorw:    ${tools.hvigorw || '(not found)'}${value.versions?.hvigor ? `  ${value.versions.hvigor}` : ''}`);
         lines.push(`  hdc:        ${tools.hdc || '(not found)'}${value.versions?.hdc ? `  ${value.versions.hdc}` : ''}`);
         lines.push(`  node/java:  ${tools.node || '?'}  /  ${tools.java || '?'}`);
+        lines.push(`  toolbar:    ${value.toolbar?.port ? `127.0.0.1:${value.toolbar.port}` : `not listening${value.toolbar?.error ? ` (${value.toolbar.error})` : ''}`}`);
         if (value.issues?.length > 0) {
           lines.push('', 'Issues:', ...value.issues.map((issue) => `  - ${issue}`));
         }

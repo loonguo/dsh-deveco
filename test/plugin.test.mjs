@@ -34,7 +34,7 @@ apply(ctx, { devecoPath: 'D:\\Software\\DevEco Studio' });
 assert.equal(tools.size, 10, 'ten tools are registered on apply');
 assert.ok(routes.has('/dsh-deveco/state'));
 assert.ok(routes.has('/dsh-deveco/control'));
-assert.equal(effects.length, 13, 'ten tools + two routes + one teardown effect');
+assert.equal(effects.length, 14, 'ten tools + two routes + toolbar server + two teardown effects');
 for (const dispose of effects) dispose();
 assert.equal(tools.size, 0, 'disposing the plugin unregisters every tool');
 
