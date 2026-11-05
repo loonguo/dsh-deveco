@@ -76,6 +76,26 @@ window.__ModuleLoader__.load({
 
     const FALLBACK = DICTIONARIES.en;
     let activeSessionId = null;
+    /** Panel instances that follow the conversation currently shown. */
+    const sessionWatchers = new Set();
+
+    /** Publish the open conversation and wake the panel immediately. */
+    function publishSession(sessionId) {
+      if (sessionId === activeSessionId) return;
+      activeSessionId = sessionId;
+      for (const watcher of [...sessionWatchers]) {
+        try {
+          watcher(sessionId);
+        } catch {
+          /* a watcher must not break the bridge */
+        }
+      }
+    }
+
+    function watchSession(watcher) {
+      sessionWatchers.add(watcher);
+      return () => sessionWatchers.delete(watcher);
+    }
 
     function readStoredPosition() {
       try {
@@ -250,7 +270,7 @@ window.__ModuleLoader__.load({
     function SessionBridge(props) {
       const sessionId = props && props.sessionId;
       React.useEffect(() => {
-        activeSessionId = typeof sessionId === 'string' && sessionId.length > 0 ? sessionId : null;
+        publishSession(typeof sessionId === 'string' && sessionId.length > 0 ? sessionId : null);
       }, [sessionId]);
       return null;
     }
@@ -264,22 +284,62 @@ window.__ModuleLoader__.load({
 
       React.useEffect(() => {
         let cancelled = false;
-        const refresh = async () => {
+        let timer = null;
+        let inFlight = false;
+        let wake = false;
+        let visible = false;
+
+        const schedule = () => {
+          if (cancelled) return;
+          timer = setTimeout(tick, visible ? 1500 : 3000);
+        };
+
+        const tick = async () => {
+          if (cancelled) return;
+          if (inFlight) {
+            wake = true;
+            return;
+          }
+          inFlight = true;
           try {
             const next = await readState(activeSessionId);
             if (!cancelled) {
+              visible = Boolean(next && next.project);
               setState(next);
               setError('');
             }
           } catch (failure) {
             if (!cancelled) setError(String((failure && failure.message) || failure));
+          } finally {
+            inFlight = false;
           }
+          if (cancelled) return;
+          if (wake) {
+            wake = false;
+            tick();
+            return;
+          }
+          schedule();
         };
-        refresh();
-        const timer = setInterval(refresh, 3000);
+
+        // Switching conversations must not wait for the next poll tick.
+        const unwatch = watchSession(() => {
+          if (timer !== null) {
+            clearTimeout(timer);
+            timer = null;
+          }
+          if (inFlight) {
+            wake = true;
+            return;
+          }
+          tick();
+        });
+
+        tick();
         return () => {
           cancelled = true;
-          clearInterval(timer);
+          unwatch();
+          if (timer !== null) clearTimeout(timer);
         };
       }, []);
 
