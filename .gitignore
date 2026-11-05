@@ -2,3 +2,11 @@
 node_modules/
 .DS_Store
 Thumbs.db
+
+# plugin runtime artifacts
+.dsh-deveco/
+.hvigor-home/
+.e2e/
+scratch/
+.ref/
+*.log

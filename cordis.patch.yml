@@ -1,0 +1,60 @@
+# dsh-deveco bundle patch — installs one Host plugin row that registers the
+# ten `deveco_*` model-facing tools and the toolbar's control routes.
+#
+# Every config key is optional; the plugin discovers the installation when a
+# path is left empty. Unknown keys are tolerated.
+#
+#   devecoPath        (string, default '')
+#       DevEco Studio installation directory (the one containing bin/,
+#       sdk/, jbr/, tools/) or the devecostudio64.exe file itself.
+#       Discovery: this key, $DEVECO_STUDIO_HOME, the Huawei Start Menu
+#       shortcut, then common install roots.
+#
+#   sdkPath           (string, default '')
+#       HarmonyOS SDK root: the directory that contains `default/openharmony`.
+#       Discovery: this key, $DEVECO_SDK_HOME, <devecoPath>/sdk,
+#       %LOCALAPPDATA%\Huawei\Sdk, <commandLineTools>/sdk.
+#
+#   commandLineTools  (string, default '')
+#       HarmonyOS command-line-tools directory (contains bin/hvigorw.bat,
+#       bin/ohpm.bat, sdk/). Discovery: this key, $OHOS_CLI_TOOLS,
+#       D:\HarmonyOS\command-line-tools, then <devecoPath> (which ships its own
+#       hvigorw wrapper under tools/hvigor).
+#
+#   projectRoot       (string, default '')
+#       Default project directory. Every tool that takes `project` still
+#       accepts an explicit override; empty means "use the session working
+#       directory when it holds AppScope/app.json5".
+#
+#   device            (string, default '')
+#       Default hdc connect key (for example 127.0.0.1:5555). Empty selects
+#       the only connected device, or fails with the list when several exist.
+#
+#   javaPath          (string, default '')
+#       Java executable used for builds/signing. Default: <devecoPath>/jbr.
+#
+#   nodePath          (string, default '')
+#       Node executable hint. Default: the one shipped with DevEco or the
+#       command-line-tools.
+#
+#   buildTimeoutMs    (number, default 600000)
+#       One hvigor build (install/run build included).
+#
+#   defaultTimeoutMs  (number, default 60000)
+#       One hdc/emulator/IDE command.
+#
+#   logBufferLines    (number, default 5000)
+#       Lines kept per live hilog capture session.
+#
+# Example:
+#
+#   - id: dsh-deveco
+#     name: '@local/dsh-deveco'
+#     config:
+#       devecoPath: 'D:\Software\DevEco Studio'
+#       projectRoot: 'D:\Projects\MyHarmonyApp'
+#       buildTimeoutMs: 900000
+- insert:
+    - id: dsh-deveco
+      name: '@local/dsh-deveco'
+      config: {}

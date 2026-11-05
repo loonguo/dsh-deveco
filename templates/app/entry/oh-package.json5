@@ -1,0 +1,9 @@
+{
+  "name": "{{moduleName}}",
+  "version": "1.0.0",
+  "description": "{{appName}} entry module",
+  "main": "",
+  "author": "",
+  "license": "",
+  "dependencies": {}
+}

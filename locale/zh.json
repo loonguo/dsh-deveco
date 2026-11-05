@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "title": "DevEco Studio",
+    "description": "在 DSH 中通过 DevEco Studio 工具链完成鸿蒙应用的构建、安装、运行、日志查看与调试。"
+  },
+  "float": {
+    "groupLabel": "DevEco Studio 控制",
+    "build": "构建 HAP",
+    "run": "运行应用",
+    "stop": "停止应用",
+    "ide": "在 DevEco Studio 中打开",
+    "idle": "未运行",
+    "running": "运行中",
+    "building": "构建中…",
+    "installing": "安装中…",
+    "launching": "启动中…",
+    "noDevice": "无设备",
+    "noProject": "无工程",
+    "failed": "DevEco 控制失败",
+    "ready": "就绪",
+    "moveHint": "拖动移动 · 双击复位位置"
+  }
+}

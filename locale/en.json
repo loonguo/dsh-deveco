@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "title": "DevEco Studio",
+    "description": "Build, install, run, log and debug HarmonyOS apps from DSH through DevEco Studio's toolchain, devices and emulators."
+  },
+  "float": {
+    "groupLabel": "DevEco Studio controls",
+    "build": "Build HAP",
+    "run": "Run app",
+    "stop": "Stop app",
+    "ide": "Open in DevEco Studio",
+    "idle": "Not running",
+    "running": "Running",
+    "building": "Building…",
+    "installing": "Installing…",
+    "launching": "Launching…",
+    "noDevice": "No device",
+    "noProject": "No project",
+    "failed": "DevEco control failed",
+    "ready": "Ready",
+    "moveHint": "Drag to move · double-click to reset position"
+  }
+}
