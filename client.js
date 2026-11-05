@@ -340,7 +340,8 @@ window.__ModuleLoader__.load({
       const running = Boolean(state && state.running);
       const device = state && state.device;
       const project = state && state.project;
-      const deviceText = device ? `${device.model || device.key}${device.api ? ` · API ${device.api}` : ''}` : translate('noDevice');
+      const deviceText = device ? (device.model || device.key) : translate('noDevice');
+      const apiText = device && device.api ? `API ${device.api}` : '';
       const projectText = project ? project.name : translate('noProject');
       const detail = state && state.message && state.message !== '' ? state.message : translate('ready');
       const tooltip = error
@@ -432,14 +433,39 @@ window.__ModuleLoader__.load({
             },
             'aria-hidden': true,
           }),
-          h('span', { key: 'title', style: { ...labelStyle, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 } }, 'DevEco Studio'),
+          h(
+            'span',
+            {
+              key: 'project',
+              style: { ...labelStyle, justifyContent: 'center', color: 'var(--dsw-alias-label-primary)', fontWeight: 600, textAlign: 'center' },
+            },
+            projectText,
+          ),
+          apiText === ''
+            ? null
+            : h(
+                'span',
+                { key: 'api', style: { ...labelStyle, flex: '0 0 auto', fontSize: '10px', color: 'var(--dsw-alias-label-tertiary)' } },
+                apiText,
+              ),
         ),
         h(
           'div',
           { key: 'detail', style: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 } },
-          h('span', { key: 'project', style: labelStyle }, projectText),
-          h('span', { key: 'sep', style: { color: 'var(--dsw-alias-label-tertiary)', fontSize: '11px', flex: 'none' } }, '·'),
-          h('span', { key: 'device', style: labelStyle }, deviceText),
+          h('span', { key: 'device', style: { ...labelStyle, flex: '0 0 auto' } }, deviceText),
+          h(
+            'span',
+            {
+              key: 'message',
+              style: {
+                ...labelStyle,
+                justifyContent: 'flex-end',
+                textAlign: 'right',
+                color: error ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-tertiary)',
+              },
+            },
+            error || detail,
+          ),
         ),
         h(
           'div',
@@ -496,15 +522,6 @@ window.__ModuleLoader__.load({
             },
             h(IconIde),
           ),
-          h('span', {
-            key: 'message',
-            style: {
-              ...labelStyle,
-              justifyContent: 'flex-end',
-              textAlign: 'right',
-              color: error ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-tertiary)',
-            },
-          }, error || detail),
         ),
         h('style', { key: 'kf' }, '@keyframes dsh-deveco-pulse{0%,100%{opacity:.35}50%{opacity:1}}'),
       );
