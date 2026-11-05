@@ -17,7 +17,7 @@
 | `deveco_build` | 调用 hvigorw 构建（`assembleHap` / `assembleApp` / `clean`），自动注入 SDK 与 DevEco 自带 JBR，解析编译诊断并列出产物 |
 | `deveco_device` | 列出 hdc 设备与本地模拟器实例；启动/停止模拟器；直接截取模拟器画面 |
 | `deveco_install` | 安装最新 HAP（或指定 HAP）到设备，或卸载 bundle；签名失败时给出 DevEco 签名配置指引 |
-| `deveco_run` | 一键构建（可选）→ 安装 → 启动，返回 PID 与可选 hilog 尾部；`debug: true` 以等待调试器模式启动 |
+| `deveco_run` | 一键构建（可选）→ 安装 → 启动，返回 PID 与可选 hilog 尾部；没有连接设备时先自动启动模拟器再运行；`debug: true` 以等待调试器模式启动 |
 | `deveco_log` | hilog 实时会话（标签/级别/PID/关键字过滤）、增量读取、停止、列表，以及 faultlog 崩溃记录读取 |
 | `deveco_ui` | 设备截图（作为图片返回）、布局树（含可点坐标）、tap / swipe / text / key 输入 |
 | `deveco_debug` | 调试生命周期：`start` 进入等待调试器、`attach`/`detach`、`status`、`cancel`、`probe` 探测 ArkTS 调试传输、`open` 交给 IDE |
@@ -133,6 +133,9 @@ HarmonyOS 的**应用内断点、单步、变量查看**由 DevEco Studio 自带
     buildTimeoutMs: 900000
     defaultTimeoutMs: 60000
     logBufferLines: 5000
+    autoStartEmulator: true
+    emulatorName: 'Mate 90 Pro'
+    emulatorBootTimeoutMs: 240000
 ```
 
 完整键说明见 [`cordis.patch.yml`](cordis.patch.yml) 顶部注释。
@@ -147,6 +150,8 @@ HarmonyOS 的**应用内断点、单步、变量查看**由 DevEco Studio 自带
 - `shell.overlay`：右下角可拖动卡片，显示设备/工程/运行状态，提供构建、运行、停止、打开 IDE 四个按钮
 
 面板每 3 秒轮询状态，按钮通过 `POST /control` 触发与 Agent 工具相同的 runtime 方法；位置保存在 `localStorage`，双击复位。样式只使用 `--dsw-alias-*` 主题变量，中英文文案走 Client locale 服务。
+
+**运行按钮**：没有连接设备时不再禁用——点一下会先启动模拟器（默认挑一个已停止的 phone 实例，可用 `emulatorName` 指定），等 hdc 报出可用设备后再安装并启动应用；应用已经在运行时，按钮图标变成环形箭头（重启），点击行为不变，仍然是重新构建后的“安装并启动”。冷启动耗时取决于模拟器冷/热启动，超时由 `emulatorBootTimeoutMs` 控制。
 
 **面板的传输方式**：桌面版 DSH 的页面以 `file://` 加载，页面里的相对 `fetch('/dsh-deveco/state')` 走 Electron IPC 桥，到达不了插件的 Host 路由（只会得到 404）。因此插件在 Host 内自己起了一个只监听 `127.0.0.1` 的小 HTTP 服务（默认端口 5731，被占用时顺延到 5740），面板先探测 `/ping` 再调用 `/state` 与 `/control`；浏览器部署下仍保留 DSH Web 服务器上的 `/dsh-deveco/*` 路由作为回退。
 
@@ -195,6 +200,7 @@ test/               smoke / plugin / toolbar / e2e 四层测试
 | 调试 | `debug start` 成功（PID、`inDebugTransport: true`），`cancel` 成功停止 |
 | 崩溃日志 | 模拟器 faultlogger 不可读时返回明确说明而不是报错 |
 | 悬浮面板链路 | `test/toolbar.test.mjs`：非工程会话下 state 正确回落到 `HelloWorld`，按钮触发的 build（成功）与 run（PID 返回）均通过 HTTP 路由完成 |
+| 无设备自动运行 | `test/run.test.mjs`：模拟器停止、hdc 只剩 Offline 记录时调用 run，自动启动 `Mate 90 Pro` → 安装 → 启动，12 秒拿到 PID（steps 含 `emulator`） |
 | 单元测试 | `node test/smoke.mjs`、`node test/plugin.test.mjs` 通过 |
 
 复跑测试：
@@ -203,6 +209,7 @@ test/               smoke / plugin / toolbar / e2e 四层测试
 node test/smoke.mjs
 node test/plugin.test.mjs
 node test/toolbar.test.mjs   # 需要设备/模拟器 + 可创建软链接的权限，会构建并启动 HelloWorld
+node test/run.test.mjs       # 冷启动回归：没有设备时自动启动模拟器再运行（需要模拟器实例）
 node test/e2e.mjs            # 从零脚手架到调试生命周期的完整回归
 ```
 
@@ -223,6 +230,7 @@ node test/e2e.mjs            # 从零脚手架到调试生命周期的完整回�
 | 面板提示 “restart DSH to activate it” | Host 侧代码尚未随本次启动装载，重启 DSH 即可 |
 | 面板显示「应用未运行」但你已打开 DevEco Studio | 面板状态指的是**被调试的鸿蒙应用进程**，不是 IDE；同一行右侧的「IDE 已打开/未打开」才是 DevEco Studio。应用要 `deveco_run` 启动后才会显示运行中 |
 | 面板显示连接不上 5731-5740 | 确认插件 Host 已随本次启动装载（`deveco_status` 的 toolbar 行会给出实际端口）；端口被其他程序占用时会自动顺延，被全部占用时会报告在 toolbar 行 |
+| 点运行后长时间停在「启动中」 | 正在等模拟器冷启动，默认最多 240 秒（`emulatorBootTimeoutMs`）；若模拟器窗口弹出许可协议需人工确认一次。没有可用实例时会直接报错并提示去 Device Manager 创建，而不是静默等待 |
 | 插件行显示「异常 / 包不可用」 | DSH 用严格 JSON 读取插件 `package.json`：文件不能带 UTF-8 BOM，`exports` 的 `./client`、`./icon`、`./locale/*.json`、`./package.json` 必须能解析。`test/smoke.mjs` 会检查 BOM 与这些导出 |
 
 ---

@@ -36,6 +36,9 @@ export const DEFAULTS = {
   defaultTimeoutMs: 60000,
   logBufferLines: 5000,
   autoBuildOnRun: true,
+  emulatorName: '',
+  autoStartEmulator: true,
+  emulatorBootTimeoutMs: 240000,
 };
 
 /** Merge a row config over the defaults. */
@@ -46,7 +49,7 @@ export function normalizeConfig(raw) {
       if (value !== undefined && value !== null) config[key] = value;
     }
   }
-  for (const key of ['buildTimeoutMs', 'defaultTimeoutMs', 'logBufferLines']) {
+  for (const key of ['buildTimeoutMs', 'defaultTimeoutMs', 'logBufferLines', 'emulatorBootTimeoutMs']) {
     const value = Number(config[key]);
     config[key] = Number.isFinite(value) && value > 0 ? value : DEFAULTS[key];
   }
@@ -199,12 +202,92 @@ export function createRuntime(rawConfig, hooks = {}) {
     return { ...result, device, project, artifact };
   };
 
+  /** Wait helper for the emulator boot loop. */
+  const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+  /**
+   * Start the configured (or default) emulator and wait until hdc reports a
+   * usable device. Used by Run when nothing is attached, so pressing the panel
+   * button on a cold machine boots the emulator and then launches the app.
+   */
+  runtime.ensureEmulator = async (options = {}) => {
+    const pathsNow = paths();
+    if (!pathsNow.tools.emulator) {
+      throw new Error('no HarmonyOS device is connected and Emulator.exe was not found; start an emulator or attach a phone with USB debugging.');
+    }
+    const { instances } = await runtime.emulator.list();
+    const wanted = options.emulatorName || config.emulatorName || '';
+    let instance = wanted === '' ? null : instances.find((entry) => entry.name === wanted) ?? null;
+    if (wanted !== '' && instance === null) {
+      throw new Error(`emulator instance "${wanted}" was not found. Instances: ${instances.map((entry) => entry.name).join(', ') || '(none)'}.`);
+    }
+    if (instance === null) {
+      instance = instances.find((entry) => !entry.running && entry.deviceType === 'phone') ?? instances.find((entry) => !entry.running) ?? null;
+    }
+    if (instance === null) {
+      throw new Error(
+        instances.length === 0
+          ? 'no emulator instance is installed; create one in DevEco Studio → Device Manager, or attach a phone.'
+          : `every emulator instance is already running (${instances.map((entry) => entry.name).join(', ')}) but none answered hdc yet; retry once it finishes booting.`,
+      );
+    }
+    message = `Starting emulator ${instance.name}…`;
+    const bootTimeoutMs = Number(config.emulatorBootTimeoutMs ?? 240000);
+    const started = await runtime.emulator.start(instance.name, { noWindow: options.noWindow === true, timeoutMs: bootTimeoutMs });
+    if (!started.running) {
+      throw new Error(`emulator ${instance.name} did not start${started.hint ? `: ${started.hint}` : '.'}`);
+    }
+    message = `Waiting for ${instance.name} to boot…`;
+    const deadline = Date.now() + bootTimeoutMs;
+    while (Date.now() < deadline) {
+      const usable = (await runtime.device.list().catch(() => ({ targets: [] }))).targets.filter((target) => target.usable);
+      if (usable.length > 0) {
+        try {
+          return { device: await runtime.device.select(options.deviceKey), name: instance.name };
+        } catch {
+          /* several devices appeared at once; retry until one can be selected */
+        }
+      }
+      await wait(2500);
+    }
+    throw new Error(`emulator ${instance.name} is running but hdc did not report a usable device within ${Math.round(bootTimeoutMs / 1000)}s.`);
+  };
+
+  /**
+   * Resolve the device for an action: an explicit target, the attached device,
+   * or — only when nothing at all is attached — a freshly started emulator.
+   */
+  runtime.resolveDevice = async (options = {}) => {
+    if (options.device) return options.device;
+    try {
+      return await runtime.device.select(options.deviceKey);
+    } catch (error) {
+      const noDevice = String(error?.message ?? error).includes('no HarmonyOS device is connected');
+      const explicit = typeof options.deviceKey === 'string' && options.deviceKey.length > 0;
+      const allowed = options.autoStartEmulator !== false && config.autoStartEmulator !== false;
+      if (!noDevice || explicit || !allowed) throw error;
+      const started = await runtime.ensureEmulator(options);
+      return started.device;
+    }
+  };
+
   /** Launch the app (optionally building/installing first). */
   runtime.run = async (options = {}) => {
     const project = options.project ?? runtime.resolveProject(options.projectDir, options.sessionId);
-    const device = options.device ?? (await runtime.device.select(options.deviceKey));
     const steps = [];
     let buildResult = null;
+    let device;
+    try {
+      device = options.device ?? (await runtime.device.select(options.deviceKey));
+    } catch (error) {
+      const noDevice = String(error?.message ?? error).includes('no HarmonyOS device is connected');
+      const explicit = typeof options.deviceKey === 'string' && options.deviceKey.length > 0;
+      const allowed = options.autoStartEmulator !== false && config.autoStartEmulator !== false;
+      if (!noDevice || explicit || !allowed) throw error;
+      const started = await runtime.ensureEmulator(options);
+      device = started.device;
+      steps.push({ step: 'emulator', ok: true, detail: started.name });
+    }
 
     if (options.build === true) {
       message = 'Building…';

@@ -212,6 +212,18 @@ window.__ModuleLoader__.load({
       return h('svg', { viewBox: '0 0 16 16', width: 12, height: 12, 'aria-hidden': true, focusable: false }, h('path', { d: 'M4 2.6v10.8L13 8 4 2.6z', fill: 'currentColor' }));
     }
 
+    /** Circular arrow shown once the app is running (the action still runs it again). */
+    function IconRestart() {
+      return h(
+        'svg',
+        { viewBox: '0 0 16 16', width: 12, height: 12, 'aria-hidden': true, focusable: false },
+        h('path', {
+          d: 'M8 2.4a5.6 5.6 0 1 1-5.3 3.7l1.5.6A4 4 0 1 0 8 4V6L4.6 3.4 8 .8v1.6z',
+          fill: 'currentColor',
+        }),
+      );
+    }
+
     function IconStop() {
       return h('svg', { viewBox: '0 0 16 16', width: 12, height: 12, 'aria-hidden': true, focusable: false }, h('rect', { x: 3.2, y: 3.2, width: 9.6, height: 9.6, rx: 1.6, fill: 'currentColor' }));
     }
@@ -467,9 +479,9 @@ window.__ModuleLoader__.load({
               'aria-label': translate('run'),
               disabled: busy || project === null,
               onClick: () => act('run'),
-              style: buttonStyle('var(--dsw-alias-state-success-primary)', busy || project === null || device === null),
+              style: buttonStyle('var(--dsw-alias-state-success-primary)', busy || project === null),
             },
-            h(IconPlay),
+            running ? h(IconRestart) : h(IconPlay),
           ),
           h(
             'button',

@@ -49,7 +49,14 @@ assert.equal(unknown.status, 400);
 const missing = await get('/nope');
 assert.equal(missing.status, 404);
 
+// The Run button launches the resolved project on the attached (or auto-started) device.
+const ran = await post({ action: 'run', sessionId: 'session-test' });
+assert.equal(ran.status, 200, `toolbar run must not fail: ${JSON.stringify(ran.body)}`);
+assert.equal(ran.body.ok, true);
+assert.ok(Number.isInteger(ran.body.state.pid) && ran.body.state.pid > 0);
+assert.equal(ran.body.state.running, true);
+
 await server.close();
 runtime.dispose();
-console.log(JSON.stringify({ port: initial.body.state.port, project: initial.body.state.project, build: built.body.state.lastBuild }, null, 2));
+console.log(JSON.stringify({ port: initial.body.state.port, project: initial.body.state.project, build: built.body.state.lastBuild, runPid: ran.body.state.pid }, null, 2));
 console.log('toolbar: ok');

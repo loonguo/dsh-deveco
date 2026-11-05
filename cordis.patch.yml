@@ -46,6 +46,20 @@
 #   logBufferLines    (number, default 5000)
 #       Lines kept per live hilog capture session.
 #
+#   autoStartEmulator (boolean, default true)
+#       When Run is pressed and no device is attached, start an emulator
+#       instance, wait for hdc, then install and launch. Set false to make the
+#       action fail with the "no device" diagnostic instead.
+#
+#   emulatorName      (string, default '')
+#       Emulator instance the automatic start uses (for example
+#       'Mate 90 Pro'). Empty picks a stopped phone instance, else the first
+#       stopped instance.
+#
+#   emulatorBootTimeoutMs (number, default 240000)
+#       How long one automatic emulator start may take, from process spawn to
+#       hdc reporting a usable device.
+#
 #   toolbarPort       (number, default 5731)
 #       First loopback port for the floating panel's own HTTP carrier. The
 #       plugin walks up to ten ports (5731-5740) when one is busy; the panel
