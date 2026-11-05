@@ -437,34 +437,14 @@ window.__ModuleLoader__.load({
             'span',
             {
               key: 'project',
-              style: { ...labelStyle, justifyContent: 'center', color: 'var(--dsw-alias-label-primary)', fontWeight: 600, textAlign: 'center' },
+              style: { ...labelStyle, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 },
             },
             projectText,
           ),
-          apiText === ''
-            ? null
-            : h(
-                'span',
-                { key: 'api', style: { ...labelStyle, flex: '0 0 auto', fontSize: '10px', color: 'var(--dsw-alias-label-tertiary)' } },
-                apiText,
-              ),
-        ),
-        h(
-          'div',
-          { key: 'detail', style: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 } },
-          h('span', { key: 'device', style: { ...labelStyle, flex: '0 0 auto' } }, deviceText),
           h(
             'span',
-            {
-              key: 'message',
-              style: {
-                ...labelStyle,
-                justifyContent: 'flex-end',
-                textAlign: 'right',
-                color: error ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-tertiary)',
-              },
-            },
-            error || detail,
+            { key: 'device', style: { ...labelStyle, flex: '0 0 auto', fontSize: '10px', color: 'var(--dsw-alias-label-tertiary)' } },
+            [deviceText, apiText].filter((part) => part !== '').join(' · '),
           ),
         ),
         h(
@@ -521,6 +501,19 @@ window.__ModuleLoader__.load({
               style: buttonStyle('var(--dsw-alias-label-secondary)', busy || project === null),
             },
             h(IconIde),
+          ),
+          h(
+            'span',
+            {
+              key: 'message',
+              style: {
+                ...labelStyle,
+                justifyContent: 'flex-end',
+                textAlign: 'right',
+                color: error ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-tertiary)',
+              },
+            },
+            error || detail,
           ),
         ),
         h('style', { key: 'kf' }, '@keyframes dsh-deveco-pulse{0%,100%{opacity:.35}50%{opacity:1}}'),
