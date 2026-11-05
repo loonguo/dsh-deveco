@@ -219,6 +219,7 @@ node test/e2e.mjs            # 从零脚手架到调试生命周期的完整回�
 | 面板不出现 | 确认已重启 DSH；客户端模块只在页面加载时注册一次 |
 | 面板按钮灰掉、或点了报 `The "path" argument must be of type string` | 旧版 Host 在会话不属于任何鸿蒙工程时解析不到工程；1.0.1 起会回落到最近工程。升级后需重启 DSH 让 Host 重新加载 |
 | 面板提示 “restart DSH to activate it” | Host 侧代码尚未随本次启动装载，重启 DSH 即可 |
+| 插件行显示「异常 / 包不可用」 | DSH 用严格 JSON 读取插件 `package.json`：文件不能带 UTF-8 BOM，`exports` 的 `./client`、`./icon`、`./locale/*.json`、`./package.json` 必须能解析。`test/smoke.mjs` 会检查 BOM 与这些导出 |
 
 ---
 

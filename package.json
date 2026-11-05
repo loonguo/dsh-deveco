@@ -1,40 +1,40 @@
-﻿{
-    "name":  "@local/dsh-deveco",
-    "version":  "1.0.1",
-    "private":  true,
-    "description":  "DevEco Studio tools for DeepSeek Harness: HarmonyOS SDK discovery, project scaffolding, hvigor builds, device/emulator install-run, hilog capture, UI automation and debug-session handoff.",
-    "type":  "module",
-    "main":  "./index.js",
-    "exports":  {
-                    ".":  "./index.js",
-                    "./client":  "./client.js",
-                    "./package.json":  "./package.json",
-                    "./locale/*.json":  "./locale/*.json",
-                    "./icon":  "./icon.svg"
-                },
-    "files":  [
-                  "index.js",
-                  "client.js",
-                  "cordis.patch.yml",
-                  "README.md",
-                  "src",
-                  "templates",
-                  "locale/*.json",
-                  "icon.svg"
-              ],
-    "dsh":  {
-                "bundle":  {
-                               "patch":  "./cordis.patch.yml"
-                           },
-                "client":  {
-                               "platform":  "web",
-                               "immediately":  true,
-                               "inject":  [
-                                              "@deepseek-ai/dsh-client-ui-conversation"
-                                          ]
-                           }
-            },
-    "scripts":  {
-                    "test":  "node --test --test-isolation=none \"test/*.test.mjs\""
-                }
+{
+  "name": "@local/dsh-deveco",
+  "version": "1.0.1",
+  "private": true,
+  "description": "DevEco Studio tools for DeepSeek Harness: HarmonyOS SDK discovery, project scaffolding, hvigor builds, device/emulator install-run, hilog capture, UI automation and debug-session handoff.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "src",
+    "templates",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test --test-isolation=none \"test/*.test.mjs\""
+  }
 }

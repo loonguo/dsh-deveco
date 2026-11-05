@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { createRuntime } from '../src/runtime.js';
 import { parseTargets } from '../src/device.js';
@@ -78,6 +79,22 @@ for (const tool of tools) {
   assert.equal(tool.parameters.type, 'object');
   assert.ok(tool.description.length > 40, `${tool.name} has a description`);
 }
+
+// The profile loader parses package.json as strict JSON and resolves locale and
+// icon resources through `exports`; a UTF-8 BOM here marks the bundle unusable.
+const manifestBytes = readFileSync(new URL('../package.json', import.meta.url));
+assert.notDeepEqual([...manifestBytes.subarray(0, 3)], [0xef, 0xbb, 0xbf], 'package.json must not start with a BOM');
+const manifest = JSON.parse(manifestBytes.toString('utf8'));
+assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml');
+assert.equal(manifest.exports['./locale/*.json'], './locale/*.json');
+for (const file of ['locale/en.json', 'locale/zh.json', 'icon.svg', 'client.js', 'index.js']) {
+  assert.ok(existsSync(new URL(`../${file}`, import.meta.url)), `${file} exists`);
+}
+for (const subpath of ['./icon', './client', '.']) {
+  assert.ok(manifest.exports[subpath], `package.json exports ${subpath}`);
+}
+JSON.parse(readFileSync(new URL('../locale/en.json', import.meta.url), 'utf8'));
+JSON.parse(readFileSync(new URL('../locale/zh.json', import.meta.url), 'utf8'));
 
 console.log(JSON.stringify({ discovered: { deveco: paths.deveco.path, sdk: paths.sdkRoot, hdc: paths.tools.hdc, hvigorw: paths.tools.hvigorw }, tools: tools.length }, null, 2));
 console.log('smoke: ok');
