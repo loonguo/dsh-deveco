@@ -16,7 +16,7 @@ import { buildProject, hvigorVersion } from './build.js';
 import { createDebugService } from './debug.js';
 import { createDeviceService } from './device.js';
 import { createEmulatorService } from './emulator.js';
-import { discover, resolveProjectDir } from './paths.js';
+import { discover, listWorkspaceProjects, resolveProjectDir } from './paths.js';
 import { describeProject, findArtifacts, readBundleName, readModules } from './project.js';
 import { run } from './exec.js';
 import { createIdeService } from './ide.js';
@@ -70,6 +70,8 @@ export function createRuntime(rawConfig, hooks = {}) {
   let busy = null;
   let message = '';
   let lastError = '';
+  /** Per-session project choice made in the floating panel. */
+  const toolbarSelections = new Map();
   /** @type {Map<string, { at: number, info: any }>} */
   const deviceInfoCache = new Map();
 
@@ -444,21 +446,49 @@ export function createRuntime(rawConfig, hooks = {}) {
     };
   };
 
+  /** Projects the panel can choose from in this workspace, newest first. */
+  runtime.toolbarProjects = (sessionId) => {
+    let base;
+    try {
+      base = sessionId === undefined ? workspace : (runtime.sessionDirectory(sessionId) ?? undefined);
+    } catch {
+      base = undefined;
+    }
+    return listWorkspaceProjects(base).map((dir) => ({ name: path.basename(dir), dir, bundleName: readBundleName(dir) }));
+  };
+
+  /** The project chosen in the panel for one session ('' when none). */
+  runtime.toolbarSelection = (sessionId) => toolbarSelections.get(sessionId ?? '') ?? '';
+
+  /** Choose one of the workspace's projects for the panel's actions. */
+  runtime.selectToolbarProject = (sessionId, directory) => {
+    const projects = runtime.toolbarProjects(sessionId);
+    const wanted = path.resolve(String(directory ?? ''));
+    if (!projects.some((entry) => entry.dir === wanted)) {
+      throw new Error(`"${wanted}" is not a project of this workspace (${projects.map((entry) => entry.name).join(', ') || 'none'})`);
+    }
+    toolbarSelections.set(sessionId ?? '', wanted);
+    message = `Project ${path.basename(wanted)}`;
+    return wanted;
+  };
+
   /** Execute a toolbar action under a single-flight guard. */
   runtime.perform = async (action, options = {}) => {
     if (busy !== null) throw new Error(`another action is running (${busy}); wait for it to finish.`);
     busy = action;
     lastError = '';
+    const selection = runtime.toolbarSelection(options.sessionId);
+    const effective = selection === '' ? options : { ...options, projectDir: options.projectDir ?? selection };
     try {
       switch (action) {
         case 'build':
-          return await runtime.build(options);
+          return await runtime.build(effective);
         case 'run':
-          return await runtime.run({ build: options.build ?? false, ...options });
+          return await runtime.run({ build: effective.build ?? false, ...effective });
         case 'stop':
-          return await runtime.stop(options);
+          return await runtime.stop(effective);
         case 'open':
-          return await runtime.ide.open({ projectDir: runtime.resolveProject(options.projectDir, options.sessionId, options.startDir).dir });
+          return await runtime.ide.open({ projectDir: runtime.resolveProject(effective.projectDir, effective.sessionId, effective.startDir).dir });
         default:
           throw new Error(`unknown action "${action}"`);
       }
@@ -495,19 +525,38 @@ export function createRuntime(rawConfig, hooks = {}) {
     } catch {
       workspace = null;
     }
+    const selection = runtime.toolbarSelection(sessionId);
+    let project = snapshot?.project ? { name: snapshot.project.name, dir: snapshot.project.dir, bundleName: snapshot.project.bundleName } : null;
+    let running = snapshot?.running ?? null;
+    if (selection !== '') {
+      try {
+        const chosen = runtime.resolveProject(selection, sessionId);
+        project = { name: chosen.name, dir: chosen.dir, bundleName: chosen.bundleName };
+        running = snapshot?.device ? await runtime.device.pidOf(snapshot.device, chosen.bundleName).catch(() => null) : null;
+      } catch {
+        /* a vanished selection falls back to the resolved project */
+      }
+    }
+    let projects = [];
+    try {
+      projects = runtime.toolbarProjects(sessionId);
+    } catch {
+      projects = [];
+    }
     return {
       ok: true,
       state: {
         busy,
         message,
         error: lastError,
-        running: snapshot?.running !== null && snapshot?.running !== undefined,
-        pid: snapshot?.running ?? null,
+        running: running !== null && running !== undefined,
+        pid: running ?? null,
+        projects,
         ideRunning,
         port: runtime.toolbarPort ?? 0,
         workspace,
         device: snapshot?.device ? { key: snapshot.device.key, model: snapshot.device.model, api: snapshot.device.api, emulator: snapshot.device.emulator } : null,
-        project: snapshot?.project ? { name: snapshot.project.name, dir: snapshot.project.dir, bundleName: snapshot.project.bundleName } : null,
+        project,
         lastBuild: lastBuild === null ? null : { ok: lastBuild.ok, errors: lastBuild.errors, warnings: lastBuild.warnings, at: lastBuild.at },
       },
     };

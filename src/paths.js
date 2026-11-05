@@ -296,6 +296,26 @@ function projectTimestamp(directory) {
 }
 
 /**
+ * Every project a workspace can select: the project containing the workspace
+ * directory, or the direct child projects when the workspace is a container.
+ * Most recently touched first, so the first entry is the default.
+ *
+ * @param {string|undefined} startDir session working directory
+ * @returns {string[]} absolute project directories
+ */
+export function listWorkspaceProjects(startDir) {
+  if (typeof startDir !== 'string' || startDir.length === 0) return [];
+  let current = path.resolve(startDir);
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (isProjectRoot(current)) return [current];
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return projectChildren(path.resolve(startDir)).sort((left, right) => projectTimestamp(right) - projectTimestamp(left));
+}
+
+/**
  * Resolve the HarmonyOS project for one workspace.
  *
  * Order: the explicit argument; the workspace directory itself or its nearest

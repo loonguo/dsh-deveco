@@ -19,7 +19,7 @@ import http from 'node:http';
 const DEFAULT_PORT = 5731;
 const PORT_ATTEMPTS = 10;
 const MAX_BODY = 64 * 1024;
-const ACTIONS = new Set(['build', 'run', 'stop', 'open']);
+const ACTIONS = new Set(['build', 'run', 'stop', 'open', 'select']);
 
 /** Only loopback peers may drive the toolbar. */
 function isLoopbackPeer(address) {
@@ -112,6 +112,12 @@ function makeServer(runtime, host) {
           sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
           projectDir: typeof body.project === 'string' ? body.project : undefined,
         };
+        if (action === 'select') {
+          runtime.selectToolbarProject(control.sessionId, control.projectDir ?? '');
+          const state = await runtime.toolbarState(control.sessionId);
+          sendJson(response, 200, state, headers);
+          return;
+        }
         if (action === 'run') control.build = false;
         await runtime.perform(action, control);
         const state = await runtime.toolbarState(control.sessionId);

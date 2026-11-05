@@ -79,7 +79,7 @@ export function createControlHandler(runtime) {
       if (request.method === 'POST' && url.pathname === '/dsh-deveco/control') {
         const body = await readJsonBody(request);
         const action = typeof body.action === 'string' ? body.action : '';
-        if (!['build', 'run', 'stop', 'open'].includes(action)) {
+        if (!['build', 'run', 'stop', 'open', 'select'].includes(action)) {
           sendJson(response, 400, { ok: false, error: `unknown action "${action}"` });
           return;
         }
@@ -87,6 +87,12 @@ export function createControlHandler(runtime) {
           sessionId: typeof body.sessionId === 'string' ? body.sessionId : undefined,
           projectDir: typeof body.project === 'string' ? body.project : undefined,
         };
+        if (action === 'select') {
+          runtime.selectToolbarProject(options.sessionId, options.projectDir ?? '');
+          const state = await runtime.toolbarState(options.sessionId);
+          sendJson(response, 200, state);
+          return;
+        }
         if (action === 'run') options.build = false;
         await runtime.perform(action, options);
         const state = await runtime.toolbarState(options.sessionId);

@@ -44,6 +44,7 @@ window.__ModuleLoader__.load({
         launching: 'Launching…',
         noDevice: 'No device',
         noProject: 'No project',
+        selectProject: 'Select project',
         failed: 'DevEco control failed',
         ready: 'Ready',
         moveHint: 'Drag to move · double-click to reset position',
@@ -66,6 +67,7 @@ window.__ModuleLoader__.load({
         launching: '启动中…',
         noDevice: '无设备',
         noProject: '无工程',
+        selectProject: '选择项目',
         failed: 'DevEco 控制失败',
         ready: '就绪',
         moveHint: '拖动移动 · 双击复位位置',
@@ -290,7 +292,7 @@ window.__ModuleLoader__.load({
       const startDrag = (event) => {
         if (event.button !== undefined && event.button !== 0) return;
         const target = event.target;
-        if (target && typeof target.closest === 'function' && target.closest('button')) return;
+        if (target && typeof target.closest === 'function' && target.closest('button,select')) return;
         event.preventDefault();
         const originX = event.clientX;
         const originY = event.clientY;
@@ -319,6 +321,19 @@ window.__ModuleLoader__.load({
         storePosition(next);
       };
 
+      const actSelect = async (directory) => {
+        setPending('select');
+        try {
+          const next = await sendControl({ action: 'select', project: directory, sessionId: activeSessionId || undefined });
+          setState(next);
+          setError('');
+        } catch (failure) {
+          setError(String((failure && failure.message) || failure));
+        } finally {
+          setPending('');
+        }
+      };
+
       const act = async (action) => {
         setPending(action);
         try {
@@ -340,6 +355,7 @@ window.__ModuleLoader__.load({
       const running = Boolean(state && state.running);
       const device = state && state.device;
       const project = state && state.project;
+      const projects = state && Array.isArray(state.projects) ? state.projects : [];
       const deviceText = device ? (device.model || device.key) : translate('noDevice');
       const apiText = device && device.api ? `API ${device.api}` : '';
       const projectText = project ? project.name : translate('noProject');
@@ -433,14 +449,40 @@ window.__ModuleLoader__.load({
             },
             'aria-hidden': true,
           }),
-          h(
-            'span',
-            {
-              key: 'project',
-              style: { ...labelStyle, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 },
-            },
-            projectText,
-          ),
+          projects.length > 1
+            ? h(
+                'select',
+                {
+                  key: 'project',
+                  value: project ? project.dir : '',
+                  title: translate('selectProject'),
+                  'aria-label': translate('selectProject'),
+                  onChange: (event) => actSelect(event.target.value),
+                  style: {
+                    flex: '1 1 auto',
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    padding: '1px 2px',
+                    border: '1px solid var(--dsw-alias-border-l1)',
+                    borderRadius: '6px',
+                    background: 'var(--dsw-alias-bg-layer-1)',
+                    color: 'var(--dsw-alias-label-primary)',
+                    font: 'inherit',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  },
+                },
+                projects.map((entry) => h('option', { key: entry.dir, value: entry.dir }, entry.name)),
+              )
+            : h(
+                'span',
+                {
+                  key: 'project',
+                  style: { ...labelStyle, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 },
+                },
+                projectText,
+              ),
           h(
             'span',
             { key: 'device', style: { ...labelStyle, flex: '0 0 auto', fontSize: '10px', color: 'var(--dsw-alias-label-tertiary)' } },

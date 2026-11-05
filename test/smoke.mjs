@@ -8,7 +8,7 @@ import { flattenLayout, parseBounds } from '../src/ui.js';
 import { parseJson5 } from '../src/project.js';
 import { parseHilogLine } from '../src/log.js';
 import { createToolDefinitions } from '../src/tools.js';
-import { resolveProjectDir } from '../src/paths.js';
+import { listWorkspaceProjects, resolveProjectDir } from '../src/paths.js';
 
 const runtime = createRuntime({ devecoPath: 'D:\\Software\\DevEco Studio' });
 const paths = runtime.paths();
@@ -101,7 +101,10 @@ JSON.parse(readFileSync(new URL('../locale/zh.json', import.meta.url), 'utf8'));
 const insideProject = resolveProjectDir({}, undefined, 'D:\\DeepSeekHarness\\projects\\HelloWorld\\entry\\src');
 assert.equal(insideProject, 'D:\\DeepSeekHarness\\projects\\HelloWorld');
 const container = resolveProjectDir({}, undefined, 'D:\\DeepSeekHarness\\projects');
-assert.ok(container && container.endsWith('HelloWorld'), `a workspace of projects resolves its project, got ${container}`);
+assert.ok(container && container.startsWith('D:\\DeepSeekHarness\\projects\\'), `a workspace of projects resolves one of its projects, got ${container}`);
+const listed = listWorkspaceProjects('D:\\DeepSeekHarness\\projects');
+assert.ok(listed.includes(container), `the resolved project is listed in the workspace, got ${container}`);
+assert.ok(listed.length >= 1);
 const nowhere = resolveProjectDir({}, undefined, 'D:\\DeepSeekHarness\\dsh-deveco');
 assert.equal(nowhere, null, 'a workspace without a project resolves to null');
 
