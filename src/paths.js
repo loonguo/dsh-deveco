@@ -256,19 +256,56 @@ export function discover(config = {}) {
 /* Project resolution                                                         */
 /* -------------------------------------------------------------------------- */
 
-/** Whether a directory looks like a HarmonyOS application project. */
+/** Whether a directory is a HarmonyOS application project root. */
 export function isProjectRoot(directory) {
-  return existsSync(path.join(directory, 'AppScope', 'app.json5')) || existsSync(path.join(directory, 'build-profile.json5'));
+  // AppScope/app.json5 is the app-level manifest; a module's build-profile.json5
+  // also exists under entry/, so it cannot identify the project root.
+  return existsSync(path.join(directory, 'AppScope', 'app.json5'));
+}
+
+/** Direct child directories that are HarmonyOS projects, bounded for huge roots. */
+function projectChildren(directory) {
+  let entries;
+  try {
+    entries = readdirSync(directory, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const found = [];
+  for (const entry of entries) {
+    if (found.length >= 32) break;
+    if (!entry.isDirectory()) continue;
+    if (/^(node_modules|oh_modules|build|\.git|\.idea|\.hvigor|\.preview|\.dsh-deveco)$/i.test(entry.name)) continue;
+    const full = path.join(directory, entry.name);
+    if (isProjectRoot(full)) found.push(full);
+  }
+  return found;
+}
+
+/** Timestamp of a project's app manifest, used to pick among siblings. */
+function projectTimestamp(directory) {
+  try {
+    return statSync(path.join(directory, 'AppScope', 'app.json5')).mtimeMs;
+  } catch {
+    try {
+      return statSync(directory).mtimeMs;
+    } catch {
+      return 0;
+    }
+  }
 }
 
 /**
  * Resolve the HarmonyOS project for one workspace.
  *
- * Order: the explicit argument; then the workspace directory itself or its
- * nearest project ancestor. A workspace that is not inside a project yields
- * null — `projectRoot` is only consulted when no workspace directory is known
- * at all (a tool call outside a session), because a configured default must
- * never make an unrelated workspace look like a project.
+ * Order: the explicit argument; the workspace directory itself or its nearest
+ * project ancestor; then — when the workspace is a folder of projects rather
+ * than a project — its direct child projects (a single child is used as is; a
+ * workspace with several children uses the most recently touched one, and the
+ * panel always shows which project that is). A workspace with no project at
+ * all yields null; `projectRoot` is only consulted when no workspace directory
+ * is known, because a configured default must never make an unrelated
+ * workspace look like a project.
  *
  * @param {{ projectRoot?: string }} config
  * @param {string|undefined} explicit
@@ -290,6 +327,11 @@ export function resolveProjectDir(config, explicit, startDir) {
       const parent = path.dirname(current);
       if (parent === current) break;
       current = parent;
+    }
+    const children = projectChildren(path.resolve(startDir));
+    if (children.length === 1) return children[0];
+    if (children.length > 1) {
+      return children.reduce((best, candidate) => (projectTimestamp(candidate) > projectTimestamp(best) ? candidate : best));
     }
     return null;
   }

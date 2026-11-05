@@ -155,7 +155,7 @@ HarmonyOS 的**应用内断点、单步、变量查看**由 DevEco Studio 自带
 
 **面板的传输方式**：桌面版 DSH 的页面以 `file://` 加载，页面里的相对 `fetch('/dsh-deveco/state')` 走 Electron IPC 桥，到达不了插件的 Host 路由（只会得到 404）。因此插件在 Host 内自己起了一个只监听 `127.0.0.1` 的小 HTTP 服务（默认端口 5731，被占用时顺延到 5740），面板先探测 `/ping` 再调用 `/state` 与 `/control`；浏览器部署下仍保留 DSH Web 服务器上的 `/dsh-deveco/*` 路由作为回退。
 
-**面板作用于哪个工程**：只看当前工作区 —— 本次调用的 `project`，否则会话工作目录本身或它最近的工程祖先（`AppScope/app.json5`）。当前工作区不是鸿蒙工程时解析结果为“无工程”，**整个浮窗都不显示**，不会借用别的工程。`projectRoot` 只在完全没有工作区信息时（例如无会话上下文的后台调用）才作为默认值；Agent 工具同样按调用所在会话的工作区解析，切换工作区后各自只看自己的工作区。
+**面板作用于哪个工程**：只看当前工作区 —— 本次调用的 `project`，否则会话工作目录本身或它最近的工程祖先（`AppScope/app.json5`）。如果工作区本身不是工程、但下面直接放着工程（例如 `D:\DeepSeekHarness\projects\HelloWorld`），则使用那个子工程：只有一个就用它，有多个就用最近修改的那个（面板会显示选中的工程名）。工作区里没有任何鸿蒙工程时解析结果为“无工程”，**整个浮窗都不显示**，不会借用别的工程。`projectRoot` 只在完全没有工作区信息时（例如无会话上下文的后台调用）才作为默认值；Agent 工具同样按调用所在会话的工作区解析，切换工作区后各自只看自己的工作区。
 
 ---
 
@@ -199,7 +199,7 @@ test/               smoke / plugin / toolbar / e2e 四层测试
 | 布局/点击 | 解析到 33 个节点，定位 `Tap me` 按钮并点击，计数器从 `Tapped 0 times` 变为 `Tapped 1 times` |
 | 调试 | `debug start` 成功（PID、`inDebugTransport: true`），`cancel` 成功停止 |
 | 崩溃日志 | 模拟器 faultlogger 不可读时返回明确说明而不是报错 |
-| 悬浮面板链路 | `test/toolbar.test.mjs`：工程工作区解析出 `HelloWorld`，build（成功）与 run（PID 返回）通过本地 HTTP 服务完成；非工程工作区返回 `project: null`（面板隐藏） |
+| 悬浮面板链路 | `test/toolbar.test.mjs`：工程工作区解析出 `HelloWorld`，build（成功）与 run（PID 返回）通过本地 HTTP 服务完成；`projects` 这类工程集合工作区解析到内部的 `HelloWorld`；非工程工作区返回 `project: null`（面板隐藏） |
 | 无设备自动运行 | `test/run.test.mjs`：模拟器停止、hdc 只剩 Offline 记录时调用 run，自动启动 `Mate 90 Pro` → 安装 → 启动，12 秒拿到 PID（steps 含 `emulator`） |
 | 单元测试 | `node test/smoke.mjs`、`node test/plugin.test.mjs` 通过 |
 
@@ -225,7 +225,7 @@ node test/e2e.mjs            # 从零脚手架到调试生命周期的完整回�
 | `no HarmonyOS device is connected` | 启动模拟器（`deveco_device emulator_start`）或连接真机并开启 USB 调试 |
 | 安装报签名错误 | 在 DevEco Studio 里启用自动签名后重新构建（见“签名说明”） |
 | `debug start` 后界面停在启动页 | 这是等待调试器的预期状态；用 `cancel` 退出，或在 IDE 中附加调试器 |
-| 面板不出现 | 当前会话工作区不是鸿蒙工程（没有 `AppScope/app.json5`）时这是预期行为；把会话工作区切到工程目录，或在该工程里打开新会话。若工作区确实是工程仍不出现，确认已重启 DSH |
+| 面板不出现 | 当前会话工作区里没有鸿蒙工程时这是预期行为；工作区是“工程集合”（如 `D:\DeepSeekHarness\projects`）会自动取里面的工程，若仍有多个候选则取最近修改的那个。把会话工作区切到工程目录，或在该工程里打开新会话。若工作区确实是工程仍不出现，确认已重启 DSH |
 | 面板按钮灰掉、或点了报 `The "path" argument must be of type string` | 旧版 Host 在会话不属于任何鸿蒙工程时解析不到工程；1.0.1 起会回落到最近工程。升级后需重启 DSH 让 Host 重新加载 |
 | 面板提示 “restart DSH to activate it” | Host 侧代码尚未随本次启动装载，重启 DSH 即可 |
 | 面板显示「应用未运行」但你已打开 DevEco Studio | 面板状态指的是**被调试的鸿蒙应用进程**，不是 IDE；同一行右侧的「IDE 已打开/未打开」才是 DevEco Studio。应用要 `deveco_run` 启动后才会显示运行中 |

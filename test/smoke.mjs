@@ -8,6 +8,7 @@ import { flattenLayout, parseBounds } from '../src/ui.js';
 import { parseJson5 } from '../src/project.js';
 import { parseHilogLine } from '../src/log.js';
 import { createToolDefinitions } from '../src/tools.js';
+import { resolveProjectDir } from '../src/paths.js';
 
 const runtime = createRuntime({ devecoPath: 'D:\\Software\\DevEco Studio' });
 const paths = runtime.paths();
@@ -96,5 +97,13 @@ for (const subpath of ['./icon', './client', '.']) {
 JSON.parse(readFileSync(new URL('../locale/en.json', import.meta.url), 'utf8'));
 JSON.parse(readFileSync(new URL('../locale/zh.json', import.meta.url), 'utf8'));
 
-console.log(JSON.stringify({ discovered: { deveco: paths.deveco.path, sdk: paths.sdkRoot, hdc: paths.tools.hdc, hvigorw: paths.tools.hvigorw }, tools: tools.length }, null, 2));
+// Workspace resolution: inside a project, in a folder of projects, and nowhere.
+const insideProject = resolveProjectDir({}, undefined, 'D:\\DeepSeekHarness\\projects\\HelloWorld\\entry\\src');
+assert.equal(insideProject, 'D:\\DeepSeekHarness\\projects\\HelloWorld');
+const container = resolveProjectDir({}, undefined, 'D:\\DeepSeekHarness\\projects');
+assert.ok(container && container.endsWith('HelloWorld'), `a workspace of projects resolves its project, got ${container}`);
+const nowhere = resolveProjectDir({}, undefined, 'D:\\DeepSeekHarness\\dsh-deveco');
+assert.equal(nowhere, null, 'a workspace without a project resolves to null');
+
+console.log(JSON.stringify({ discovered: { deveco: paths.deveco.path, sdk: paths.sdkRoot, hdc: paths.tools.hdc, hvigorw: paths.tools.hvigorw }, tools: tools.length, container }, null, 2));
 console.log('smoke: ok');

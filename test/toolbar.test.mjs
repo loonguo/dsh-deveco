@@ -67,9 +67,23 @@ assert.equal(empty.status, 200);
 assert.equal(empty.body.state.project, null, 'a non-project workspace must not borrow another project');
 
 await projectServer.close();
+// A workspace that is a folder of projects resolves the project inside it.
+const containerRuntime = createRuntime(
+  { devecoPath: 'D:\\Software\\DevEco Studio' },
+  { resolveSessionDirectory: () => 'D:\\DeepSeekHarness\\projects' },
+);
+const containerServer = await createToolbarServer(containerRuntime, { port: 0 });
+const container = await get(containerServer, '/state?sessionId=session-container');
+assert.equal(container.status, 200);
+assert.ok(container.body.state.project, 'a workspace of projects resolves a project');
+assert.equal(container.body.state.project.name, 'HelloWorld');
+
+await projectServer.close();
 await emptyServer.close();
+await containerServer.close();
 projectRuntime.dispose();
 emptyRuntime.dispose();
+containerRuntime.dispose();
 console.log(
   JSON.stringify(
     {
@@ -78,6 +92,7 @@ console.log(
       build: built.body.state.lastBuild,
       runPid: ran.body.state.pid,
       nonProjectState: empty.body.state.project,
+      containerProject: container.body.state.project,
     },
     null,
     2,
