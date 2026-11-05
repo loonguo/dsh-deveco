@@ -340,7 +340,6 @@ window.__ModuleLoader__.load({
       const running = Boolean(state && state.running);
       const device = state && state.device;
       const project = state && state.project;
-      const statusText = pending === 'build' ? translate('building') : pending === 'run' ? translate('launching') : running ? translate('appRunning') : translate('appIdle');
       const ideRunning = Boolean(state && state.ideRunning);
       const ideText = ideRunning ? translate('ideOpen') : translate('ideClosed');
       const deviceText = device ? `${device.model || device.key}${device.api ? ` · API ${device.api}` : ''}` : translate('noDevice');
@@ -436,7 +435,6 @@ window.__ModuleLoader__.load({
             'aria-hidden': true,
           }),
           h('span', { key: 'title', style: { ...labelStyle, color: 'var(--dsw-alias-label-primary)', fontWeight: 600 } }, 'DevEco Studio'),
-          h('span', { key: 'status', style: labelStyle }, statusText),
           h(
             'span',
             {
