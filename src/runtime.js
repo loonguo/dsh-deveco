@@ -489,6 +489,12 @@ export function createRuntime(rawConfig, hooks = {}) {
       snapshot = null;
     }
     const ideRunning = await runtime.ideRunning();
+    let workspace = null;
+    try {
+      workspace = sessionId === undefined ? null : (runtime.sessionDirectory(sessionId) ?? null);
+    } catch {
+      workspace = null;
+    }
     return {
       ok: true,
       state: {
@@ -499,6 +505,7 @@ export function createRuntime(rawConfig, hooks = {}) {
         pid: snapshot?.running ?? null,
         ideRunning,
         port: runtime.toolbarPort ?? 0,
+        workspace,
         device: snapshot?.device ? { key: snapshot.device.key, model: snapshot.device.model, api: snapshot.device.api, emulator: snapshot.device.emulator } : null,
         project: snapshot?.project ? { name: snapshot.project.name, dir: snapshot.project.dir, bundleName: snapshot.project.bundleName } : null,
         lastBuild: lastBuild === null ? null : { ok: lastBuild.ok, errors: lastBuild.errors, warnings: lastBuild.warnings, at: lastBuild.at },

@@ -26,13 +26,17 @@ export const inject = ['tools'];
  */
 export function apply(ctx, config) {
   const get = typeof ctx.get === 'function' ? (name) => ctx.get(name) : () => undefined;
-  const agents = get('agents');
-  const workingDirectory = get('workingDirectory');
-  const webServer = get('webServer');
 
-  /** Map a Session id from the page to the directory that session works in. */
+  /**
+   * Services are looked up on every call, never captured at apply time: plugin
+   * rows activate before every dependency of a large profile is registered, so
+   * an early `ctx.get('agents')` can legitimately be undefined and would then
+   * pin the toolbar to "no session" for the whole process lifetime.
+   */
   const resolveSessionDirectory = (sessionId) => {
     try {
+      const agents = get('agents');
+      const workingDirectory = get('workingDirectory');
       const agent = agents?.get?.(sessionId);
       const session = agent?.session;
       if (session !== undefined && session !== null && typeof workingDirectory?.get === 'function') {
@@ -47,6 +51,7 @@ export function apply(ctx, config) {
   /** Map a tool call's agent to the directory its session works in. */
   const resolveAgentDirectory = (agent) => {
     try {
+      const workingDirectory = get('workingDirectory');
       const session = agent?.session;
       if (session !== undefined && session !== null && typeof workingDirectory?.get === 'function') {
         return workingDirectory.get(session);
@@ -102,11 +107,20 @@ export function apply(ctx, config) {
   }
 
   // Browser deployments serve the page from the DSH web server; the same two
-  // operations stay available there under their original paths.
-  if (webServer !== undefined && webServer !== null && typeof webServer.register === 'function') {
+  // operations stay available there under their original paths. Registering
+  // through `ctx.inject` keeps them working even when the web server activates
+  // after this row.
+  const registerRoutes = (webServer) => {
+    if (webServer === undefined || webServer === null || typeof webServer.register !== 'function') return;
     const handler = createControlHandler(runtime);
     for (const path of ['/dsh-deveco/state', '/dsh-deveco/control']) {
       ctx.effect(() => webServer.register({ kind: 'exact', path, handler }), `dsh-deveco: route ${path}`);
     }
+  };
+  const webServerNow = get('webServer');
+  if (webServerNow !== undefined && webServerNow !== null) {
+    registerRoutes(webServerNow);
+  } else if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], (scope) => registerRoutes(scope?.webServer ?? get('webServer')));
   }
 }

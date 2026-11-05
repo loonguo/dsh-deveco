@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-deveco",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "description": "DevEco Studio tools for DeepSeek Harness: HarmonyOS SDK discovery, project scaffolding, hvigor builds, device/emulator install-run, hilog capture, UI automation and debug-session handoff.",
   "type": "module",
